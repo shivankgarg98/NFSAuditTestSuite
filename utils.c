@@ -239,6 +239,35 @@ cleanup(void)
 		system("service auditd onestop > /dev/null 2>&1");
 }
 
+int
+nfs_poll_fd(struct rpc_context *rpc, struct client *client)
+{
+	struct pollfd pfd;
+	
+	for (;;) {
+		pfd.fd = rpc_get_fd(rpc);
+		pfd.events = rpc_which_events(rpc);
+
+		if (poll(&pfd, 1, -1) < 0) {
+			printf("Poll failed\n");
+			exit(10);
+		}
+
+		if (rpc_service(rpc, pfd.revents) < 0) {
+			printf("rpc_service failed\n");
+			return RPC_STATUS_ERROR;
+		}
+
+		if (client->is_finished) {
+			break;
+		}
+
+	}
+	
+	return client->au_rpc_status;
+
+}
+
 static void
 nfs_connect_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
 {

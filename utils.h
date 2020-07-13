@@ -24,8 +24,9 @@ struct client {
 	struct	nfs_fh3 rootfh;
 };
 
-void nfs_setup(struct rpc_context *rpc, void *private_data);
-void nfs_destroy(struct rpc_context *rpc);
+int nfs_poll_fd(struct rpc_context *, struct client *);
+void nfs_setup(struct rpc_context *, void *);
+void nfs_destroy(struct rpc_context *);
 
 void check_audit(struct pollfd [], const char *, FILE *);
 FILE *setup(struct pollfd [], const char *);

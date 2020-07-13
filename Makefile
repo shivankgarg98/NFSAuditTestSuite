@@ -1,16 +1,15 @@
-# $FreeBSD$
-
 TESTSDIR=	${LOCALBASE}/tests/nfs-audit
 
-ATF_TESTS_C+=	nfs-test3
+PROG=	nfs-test3
 
-SRCS.nfs-test3+=	nfs-test3.c
-SRCS.nfs-test3+=	utils.c
-
-LDFLAGS+=	-lbsm -lutil
-
-LDADD.nfs-test3+=	${LOCALBASE}/lib/libnfs.a
+SRCS+=	nfs-test3.c
+SRCS+=	utils.c
 
 CFLAGS+=	-I${LOCALBASE}/include
+
+LDFLAGS+=	-lbsm -latf-c -lnfs
+
+LDADD+=	-L${LOCALBASE}/lib
+
 
 .include <bsd.test.mk>
