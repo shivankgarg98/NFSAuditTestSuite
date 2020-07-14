@@ -11,5 +11,4 @@ LDFLAGS+=	-lbsm -latf-c -lnfs
 
 LDADD+=	-L${LOCALBASE}/lib
 
-
 .include <bsd.test.mk>

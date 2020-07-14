@@ -1,0 +1,6 @@
+syntax(2)
+
+test_suite("nfs-audit")
+
+atf_test_program{name="nfs-test3"}
+

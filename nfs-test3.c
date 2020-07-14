@@ -6,7 +6,7 @@
 #include "utils.h"
 
 #define SERVER "192.168.56.105"
-#define EXPORT "/usr/home/shivank/TEST_NFS"
+#define EXPORT "/mnt/NFS_audit_test"
 
 static struct pollfd fds[1];
 static const char *auclass = "nfs";
@@ -15,26 +15,29 @@ static const char *successreg = "fileforaudit.*return,success";
 static const char *failurereg = "fileforaudit.*return,failure";
 
 static void
-nfs3_mkdir_status_cb(__unused struct rpc_context *rpc, int status, __unused void * data, void *private_data)
+nfs3_res_mkdir_cb(__unused struct rpc_context *rpc, int status, void *data, void *private_data)
 {
 	struct client *client = private_data;
+	MKDIR3res *res;
 	
+	res = data;
+	client->au_rpc_result = res->status;
 	client->au_rpc_status = status;
 	client->is_finished = 1;
 	printf("complete\n");
 }
 
 static void
-nfs3_mkdir_cb(struct rpc_context *rpc, int status, __unused void *data, void *private_data)
+nfs3_call_mkdir_cb(struct rpc_context *rpc, int status, __unused void *data, void *private_data)
 {
 	struct client *client = private_data;
+	MKDIR3args args;
 
 	if (status != RPC_STATUS_SUCCESS) {
 		printf("connection to RPC.MOUNTD on server %s failed\n", client->server);
 		exit(10);
 	}
 
-	MKDIR3args args;
 	memset(&args, 0, sizeof(MKDIR3args));
 	args.where.dir = client->rootfh;
 	args.where.name = path;
@@ -42,7 +45,7 @@ nfs3_mkdir_cb(struct rpc_context *rpc, int status, __unused void *data, void *pr
 	args.attributes.mode.set_mode3_u.mode = 777;
 
 	printf("Connected to RPC.NFSD on %s:%d\n", client->server, client->mount_port);
-	if (rpc_nfs3_mkdir_async(rpc, nfs3_mkdir_status_cb, &args, client) != 0) {
+	if (rpc_nfs3_mkdir_async(rpc, nfs3_res_mkdir_cb, &args, client) != 0) {
 		printf("Failed to send mkdir request\n");
 		exit(10);
 	}
@@ -66,12 +69,14 @@ ATF_TC_BODY(nfs3_mkdir_success, tc)
 	client.export = EXPORT;
 	client.au_rpc_status = -1;
 	client.is_finished = 0;
-	client.au_rpc_cb = nfs3_mkdir_cb;
+	client.au_rpc_cb = nfs3_call_mkdir_cb;
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
-	ATF_CHECK_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
+	
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
 	nfs_destroy(rpc);
-	ATF_CHECK_EQ(RPC_STATUS_SUCCESS, client.au_rpc_status);
+	
+	ATF_REQUIRE_EQ(NFS3_OK, client.au_rpc_result);
 
 	check_audit(fds, successreg, pipefd);
 }
@@ -79,6 +84,7 @@ ATF_TC_BODY(nfs3_mkdir_success, tc)
 ATF_TC_CLEANUP(nfs3_mkdir_success, tc)
 {
 	cleanup();
+	remove("/mnt/NFS_audit_test/fileforaudit");
 }
 
 ATF_TC_WITH_CLEANUP(nfs3_mkdir_failure);
@@ -94,30 +100,34 @@ ATF_TC_BODY(nfs3_mkdir_failure, tc)
 	struct rpc_context *rpc;
 	struct pollfd pfd;
 	struct client client;
-	
+
 	client.server = SERVER;
 	client.export = EXPORT;
 	client.au_rpc_status = -1;
 	client.is_finished = 0;
-	client.au_rpc_cb = nfs3_mkdir_cb;
+	client.au_rpc_cb = nfs3_call_mkdir_cb;
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
-	ATF_CHECK_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
+	printf("res->status: %d", client.au_rpc_result);
+	ATF_REQUIRE_EQ(NFS3_OK, client.au_rpc_result);
 	nfs_destroy(rpc);
 	memset(&client, 0, sizeof(struct client));
-
+	
+	/* mkdir rpc return error as the directory already exists. */
 	pipefd = setup(fds, auclass);
 	client.server = SERVER;
 	client.export = EXPORT;
 	client.au_rpc_status = -1;
 	client.is_finished = 0;
-	client.au_rpc_cb = nfs3_mkdir_cb;
+	client.au_rpc_cb = nfs3_call_mkdir_cb;
 
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
-	ATF_CHECK_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
 	nfs_destroy(rpc);
-
+	printf("res->status: %d", client.au_rpc_result);
+	ATF_REQUIRE(NFS3_OK != client.au_rpc_result);
 
 	check_audit(fds, failurereg, pipefd);
 }
@@ -125,6 +135,7 @@ ATF_TC_BODY(nfs3_mkdir_failure, tc)
 ATF_TC_CLEANUP(nfs3_mkdir_failure, tc)
 {
 	cleanup();
+	remove("/mnt/NFS_audit_test/fileforaudit");
 }
 
 ATF_TP_ADD_TCS(tp)

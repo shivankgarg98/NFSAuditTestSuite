@@ -24,10 +24,10 @@
  *
  * $FreeBSD$
  */
-#include <sys/ioctl.h>
 
 #include <bsm/libbsm.h>
 #include <security/audit/audit_ioctl.h>
+#include <sys/ioctl.h>
 
 #include <atf-c.h>
 #include <errno.h>
@@ -235,6 +235,8 @@ FILE
 void
 cleanup(void)
 {
+	if (atf_utils_file_exists("started_nfsd"))
+		system("service nfsd onestop > /dev/null 2>&1");
 	if (atf_utils_file_exists("started_auditd"))
 		system("service auditd onestop > /dev/null 2>&1");
 }
@@ -479,7 +481,7 @@ pmap_connect_cb(struct rpc_context *rpc, int status, void *data, void *private_d
 {
 	struct client *client = private_data;
 
-	printf("pmap_connect_cb    status:%d.\n", status);
+	printf("pmap_connect_cb status:%d.\n", status);
 	if (status != RPC_STATUS_SUCCESS) {
 		printf("connection to portmapper on server %s failed\n", client->server);
 		exit(10);
@@ -497,15 +499,13 @@ nfs_setup(struct rpc_context *rpc, void *private_data)
 {
 	struct client *client = private_data;
 
-	if (rpc == NULL) {
-		printf("failed to init context\n");
-		exit(10);
-	}
+	ATF_REQUIRE(rpc != NULL);
 
-	if (rpc_connect_async(rpc, client->server, 111, pmap_connect_cb, client) != 0) {
-		printf("Failed to start connection\n");
-		exit(10);
-	}
+	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
+	{ service nfsd onestart && touch started_nfsd ; }"));
+
+	ATF_REQUIRE_EQ(0, rpc_connect_async(rpc, client->server, 111,
+	    pmap_connect_cb, client));
 }
 
 void

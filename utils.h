@@ -20,6 +20,7 @@ struct client {
 	uint32_t	mount_port;
 	rpc_cb	au_rpc_cb;
 	int	au_rpc_status;
+	int	au_rpc_result; /* RPC result status/error. refer: libnfs-raw-nfs.h */
 	int	is_finished;
 	struct	nfs_fh3 rootfh;
 };
