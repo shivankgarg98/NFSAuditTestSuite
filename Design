@@ -2,7 +2,5 @@ TEST CASES FOR NFS AUDIT
 
 1. What and How should I export folder for NFS sharing? Currently, SERVER: 192.168.56.105 and EXPORT: /usr/shivank/home/audit_TEST_NFS, I wish to make it more generic and without affecting exports(5).
 using 127.0.0.1 as SERVER leads to permission denied error in mkdir.
-2. undo the changes made by the RPC. For example, removing the directory or regular file.
-	(a.) I use the remove("/mnt/audit_TEST_NFS/fileforaudit") call in cleanup part. Is it the right way?
-3. difference b/w ATF_CHECK_EQ and ATF_REQUIRE_EQ?
-4. TODO: replace all if () ... exit(10) with ATF_CHECK_EQ/ATF_REQUIRE_EQ
+2. How to exports the subdirectory in Kyua generated temp folder. Currently, I hardcode path values /etc/exports and same with ATF TEST CASE. Exporting the server directory through the ATF program will be more good.
+3. Reduce code duplicacy while writing test body. Looking for some way to do it. Currently thinking of defining a macro to do the same.
