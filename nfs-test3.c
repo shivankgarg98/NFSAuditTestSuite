@@ -19,71 +19,6 @@ static char *server_path = "/mnt/NFS_audit_test/fileforaudit";
 static const char *successreg = "fileforaudit.*return,success";
 static const char *failurereg = "fileforaudit.*return,failure";
 
-static void
-nfs3_res_create_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-	CREATE3res *res;
-
-	res = data;
-	client->au_rpc_result = res->status;
-	client->au_rpc_status = status;
-	client->is_finished = 1;
-	printf("complete\n");
-}
-
-static void
-nfs3_call_create_cb(struct rpc_context *rpc, int status, __unused void *data, void *private_data)
-{
-	struct client *client = private_data;
-	CREATE3args args;
-
-	if (status != RPC_STATUS_SUCCESS) {
-		printf("connection to RPC.MOUNTD on server %s failed\n", client->server);
-		exit(10);
-	}
-
-	memset(&args, 0, sizeof(CREATE3args));
-	args.where.dir = client->rootfh;
-	args.where.name = client_path;
-	args.how.mode = GUARDED; /* Similiar to case if O_EXCL flag is provided with O_CREAT. */
-	args.how.createhow3_u.obj_attributes.mode.set_it = 1;
-	args.how.createhow3_u.obj_attributes.mode.set_mode3_u.mode = mode;
-
-	ATF_REQUIRE_EQ(0, rpc_nfs3_create_async(rpc, nfs3_res_create_cb, &args, client));
-}
-static void
-nfs3_res_mkdir_cb(__unused struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-	MKDIR3res *res;
-	
-	res = data;
-	client->au_rpc_result = res->status;
-	client->au_rpc_status = status;
-	client->is_finished = 1;
-	printf("complete\n");
-}
-
-static void
-nfs3_call_mkdir_cb(struct rpc_context *rpc, int status, __unused void *data, void *private_data)
-{
-	struct client *client = private_data;
-	MKDIR3args args;
-
-	if (status != RPC_STATUS_SUCCESS) {
-		printf("connection to RPC.MOUNTD on server %s failed\n", client->server);
-		exit(10);
-	}
-
-	memset(&args, 0, sizeof(MKDIR3args));
-	args.where.dir = client->rootfh;
-	args.where.name = client_path;
-	args.attributes.mode.set_it = 1;
-	args.attributes.mode.set_mode3_u.mode = mode;
-
-	ATF_REQUIRE_EQ(0, rpc_nfs3_mkdir_async(rpc, nfs3_res_mkdir_cb, &args, client));
-}
 
 ATF_TC_WITH_CLEANUP(nfs3_create_success);
 ATF_TC_HEAD(nfs3_create_success, tc)
@@ -102,7 +37,7 @@ ATF_TC_BODY(nfs3_create_success, tc)
 	client.export = EXPORT;
 	client.au_rpc_status = -1;
 	client.is_finished = 0;
-	client.au_rpc_cb = nfs3_call_create_cb;
+	client.au_rpc_event = AUE_NFS3RPC_CREATE;
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
 
@@ -132,13 +67,16 @@ ATF_TC_BODY(nfs3_create_failure, tc)
 	FILE *pipefd = setup(fds, auclass);
 	struct rpc_context *rpc;
 	struct client client;
-	
+	char buf[111];
+	getcwd(buf,111);
+	printf("********************%s\n",buf);
+
 	ATF_REQUIRE(open(server_path, O_CREAT, mode) != -1);	
 	client.server = SERVER;
 	client.export = EXPORT;
 	client.au_rpc_status = -1;
 	client.is_finished = 0;
-	client.au_rpc_cb = nfs3_call_create_cb;
+	client.au_rpc_event = AUE_NFS3RPC_CREATE;
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
 
@@ -173,7 +111,7 @@ ATF_TC_BODY(nfs3_mkdir_success, tc)
 	client.export = EXPORT;
 	client.au_rpc_status = -1;
 	client.is_finished = 0;
-	client.au_rpc_cb = nfs3_call_mkdir_cb;
+	client.au_rpc_event = AUE_NFS3RPC_MKDIR;
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
 	
@@ -208,7 +146,7 @@ ATF_TC_BODY(nfs3_mkdir_failure, tc)
 	client.export = EXPORT;
 	client.au_rpc_status = -1;
 	client.is_finished = 0;
-	client.au_rpc_cb = nfs3_call_mkdir_cb;
+	client.au_rpc_event = AUE_NFS3RPC_MKDIR;
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
 	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
@@ -224,7 +162,7 @@ ATF_TC_BODY(nfs3_mkdir_failure, tc)
 	client.export = EXPORT;
 	client.au_rpc_status = -1;
 	client.is_finished = 0;
-	client.au_rpc_cb = nfs3_call_mkdir_cb;
+	client.au_rpc_event = AUE_NFS3RPC_MKDIR;
 
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
