@@ -244,6 +244,35 @@ cleanup(void)
 		system("service auditd onestop > /dev/null 2>&1");
 }
 
+void tc_body_helper(int au_rpc_event, int tc_type, char *regex)
+{
+	FILE *pipefd = setup(fds, auclass);
+	struct rpc_context *rpc;
+	struct client client;
+
+	client.server = SERVER;
+	client.export = EXPORT;
+	client.au_rpc_status = -1;
+	client.au_rpc_result = -1;
+	client.is_finished = 0;
+	client.au_rpc_event = au_rpc_event;
+	rpc = rpc_init_context();
+	nfs_setup(rpc, &client);
+
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
+	nfs_destroy(rpc);
+
+	switch (tc_type) {
+	case SUCCESS: 
+		ATF_REQUIRE(NFS3_OK == client.au_rpc_result);
+		break;
+	case FAILURE:
+		ATF_REQUIRE(NFS3_OK != client.au_rpc_result);
+		break;
+	}
+	check_audit(fds, regex, pipefd);
+}
+
 int
 nfs_poll_fd(struct rpc_context *rpc, struct client *client)
 {
@@ -255,19 +284,16 @@ nfs_poll_fd(struct rpc_context *rpc, struct client *client)
 
 		if (poll(&pfd, 1, -1) < 0) {
 			atf_tc_fail("poll failed");
-			client->au_rpc_status = RPC_STATUS_ERROR;
-			break;
+			exit(10);
 		}
 
 		if (rpc_service(rpc, pfd.revents) < 0) {
 			atf_tc_fail("rpc_service failed");
-			client->au_rpc_status = RPC_STATUS_ERROR;
 			break;
 		}
 		if (client->is_finished) {
 			break;
 		}
-
 	}
 	
 	return client->au_rpc_status;
@@ -279,11 +305,50 @@ nfs_res_close_cb(struct rpc_context *rpc, int status, void *data, void *private_
 {
 	struct client *client = private_data;
 	switch (client->au_rpc_event) {
+	case AUE_NFS3RPC_GETATTR:
+		client->au_rpc_result = ((GETATTR3res *)data)->status;
+		break;
+	case AUE_NFS3RPC_SETATTR:
+		break;
+	case AUR_NFS3RPC_LOOKUP:
+		break;
+	case AUE_NFS3RPC_ACCESS:
+		break;
+	case AUE_NFS3RPC_READLINK:
+		break;
+	case AUE_NFS3RPC_READ:
+		break;
 	case AUE_NFS3RPC_CREATE:
 		client->au_rpc_result = ((CREATE3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_MKDIR:
 		client->au_rpc_result = ((MKDIR3res *)data)->status;
+		break;
+	case AUE_NFS3RPC_WRITE:
+		break;
+	case AUE_NFS3RPC_SYMLINK:
+		break;
+	case AUE_NFS3RPC_MKNOD:
+		break;
+	case AUE_NFS3RPC_REMOVE:
+		break;
+	case AUE_NFS3RPC_RMDIR:
+		break;
+	case AUE_NFS3RPC_RENAME:
+		break;
+	case AUE_NFS3RPC_LINK:
+		break;
+	case AUE_NFS3RPC_READDIR:
+		break;
+	case AUE_NFS3RPC_READDIRPLUS:
+		break;
+	case AUE_NFS3RPC_FSSTAT:
+		break;
+	case AUE_NFS3RPC_FSINFO:
+		break;
+	case AUE_NFS3RPC_PATHCONF:
+		break;
+	case AUE_NFS3RPC_COMMIT:
 		break;
 	default:
 		ATF_REQUIRE_EQ(1,0);
@@ -303,6 +368,37 @@ nfs_connect_cb(struct rpc_context *rpc, int status, void *data, void *private_da
 	printf("Connected to RPC.NFSD on %s:%d\n", client->server, client->mount_port);
 	
 	switch (client->au_rpc_event) {
+	case AUE_NFS3RPC_GETATTR:
+	{
+		GETATTR3args args;
+		args.object = client->rootfh;
+		ATF_REQUIRE_EQ(0, rpc_nfs3_getattr_async(rpc, nfs_res_close_cb, &args, client));
+		break;
+	}
+	case AUE_NFS3RPC_SETATTR:
+	{
+		break;
+	}
+	case AUR_NFS3RPC_LOOKUP:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_ACCESS:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_READLINK:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_READ:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_WRITE:
+	{
+		break;
+	}
 	case AUE_NFS3RPC_CREATE:
 	{
 		CREATE3args args;
@@ -322,6 +418,54 @@ nfs_connect_cb(struct rpc_context *rpc, int status, void *data, void *private_da
 		args.attributes.mode.set_it = 1;
 		args.attributes.mode.set_mode3_u.mode = 0777;
 		ATF_REQUIRE_EQ(0, rpc_nfs3_mkdir_async(rpc, nfs_res_close_cb, &args, client));
+		break;
+	}
+	case AUE_NFS3RPC_SYMLINK:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_MKNOD:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_REMOVE:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_RMDIR:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_RENAME:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_LINK:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_READDIR:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_READDIRPLUS:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_FSSTAT:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_FSINFO:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_PATHCONF:
+	{
+		break;
+	}
+	case AUE_NFS3RPC_COMMIT:
+	{
 		break;
 	}
 	default:

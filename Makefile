@@ -1,8 +1,8 @@
 TESTSDIR=	${LOCALBASE}/tests/nfs-audit
 
-PROG=	nfs-test3
+PROG=	nfs-test1
 
-SRCS+=	nfs-test3.c
+SRCS+=	nfs-test1.c
 SRCS+=	utils.c
 
 CFLAGS+=	-I${LOCALBASE}/include

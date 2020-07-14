@@ -25,13 +25,26 @@ struct client {
 	struct	nfs_fh3 rootfh;
 };
 
+static char *SERVER = "192.168.56.105";
+static char *EXPORT = "/mnt/NFS_audit_test";
+static struct pollfd fds[1];
+static mode_t mode = 0777;
+static const char *auclass = "nfs";
+
 int nfs_poll_fd(struct rpc_context *, struct client *);
 void nfs_setup(struct rpc_context *, void *);
 void nfs_destroy(struct rpc_context *);
 
+void tc_body_helper(int, int, char *);
 void check_audit(struct pollfd [], const char *, FILE *);
 FILE *setup(struct pollfd [], const char *);
 void cleanup(void);
+
+/*
+ * ATF test case success/failure
+ */
+#define SUCCESS 0
+#define FAILURE 1
 
 /*
  * NFSv3 RPC related events
@@ -57,5 +70,8 @@ void cleanup(void);
 #define AUE_NFS3RPC_FSINFO	43284
 #define AUE_NFS3RPC_PATHCONF	43285
 #define AUE_NFS3RPC_COMMIT	43286
+
+
+
 
 #endif
