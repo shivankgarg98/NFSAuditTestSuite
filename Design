@@ -4,3 +4,8 @@ TEST CASES FOR NFS AUDIT
 using 127.0.0.1 as SERVER leads to permission denied error in mkdir.
 2. How to exports the subdirectory in Kyua generated temp folder. Currently, I hardcode path values /etc/exports and same with ATF TEST CASE. Exporting the server directory through the ATF program will be more good.
 3. Reduce code duplicacy while writing test body. Looking for some way to do it. Currently I defiined a helper function which do the job pretty good.
+4. My Current Test Design:
+	a.) I assume the RPC executes successfully. (i.e. the status == RPC_STATUS_SUCCESS). If not, the test case fails.
+	b.) Now, when the RPC have been executed. The RPC result status may be NFS3_OK or some error. NFS3_OK indicates the RPC have successfully done its work. For instance, if the directoy already exists in mkdir case, the status rpc_cb will be RPC_STATUS_SUCCESS and (MKDIR3res *)res->status will not be NFS3_OK and some error.
+	c.) For the success scenarios, the above testing is clear and simple. But In case of failure, we can fail the RPC in many ways. Should I also include the case where RPC fails (possibly due to invalid arguemnts and result in RPC_STATUS_ERROR)?
+5. Problems with the design described in Point 4. I'm unable to find the failure cases with res != NFS3_OK. (like case of getattr)

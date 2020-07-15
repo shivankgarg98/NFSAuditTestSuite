@@ -21,6 +21,7 @@ struct client {
 	int	au_rpc_status;
 	int	au_rpc_result; /* RPC result status/error. refer: libnfs-raw-nfs.h */
 	int	au_rpc_event;
+	int	au_test_nature;
 	int	is_finished;
 	struct	nfs_fh3 rootfh;
 };

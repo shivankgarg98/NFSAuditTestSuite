@@ -255,6 +255,7 @@ void tc_body_helper(int au_rpc_event, int tc_type, char *regex)
 	client.au_rpc_status = -1;
 	client.au_rpc_result = -1;
 	client.is_finished = 0;
+	client.au_test_nature = tc_type;
 	client.au_rpc_event = au_rpc_event;
 	rpc = rpc_init_context();
 	nfs_setup(rpc, &client);
