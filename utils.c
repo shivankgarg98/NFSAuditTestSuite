@@ -39,9 +39,6 @@
 
 #include "utils.h"
 
-static char *client_path = "fileforaudit";
-static char *server_path = "/mnt/NFS_audit_test/fileforaudit";
-
 /*
  * Checks the presence of "auditregex" in auditpipe(4) after the
  * corresponding system call has been triggered.
@@ -238,6 +235,10 @@ FILE
 void
 cleanup(void)
 {
+	if (atf_utils_file_exists("mountd_running"))
+		system("service mountd restart > /dev/null 2>&1");
+	else
+		system("service mountd onestop > /dev/null 2>&1");
 	if (atf_utils_file_exists("started_nfsd"))
 		system("service nfsd onestop > /dev/null 2>&1");
 	if (atf_utils_file_exists("started_auditd"))
@@ -245,23 +246,25 @@ cleanup(void)
 }
 
 struct nfs_context
-*tc_body_init(int au_rpc_event, int tc_type, struct au_rpc_data* au_test_data)
+*tc_body_init(int au_rpc_event, struct au_rpc_data* au_test_data)
 {
 	struct nfs_context *nfs;
 	struct nfs_url url;
+	char cwd[PATH_MAX];
 
 	nfs = nfs_init_context();
 	ATF_REQUIRE(nfs != NULL);
 	au_test_data->au_rpc_event = au_rpc_event;
 	au_test_data->au_rpc_status = -1;
 	au_test_data->au_rpc_result = -1;
-	au_test_data->au_test_nature = tc_type;
-	au_test_data->file_path = client_path;
 	au_test_data->is_finished = 0;
+	ATF_REQUIRE_EQ(0, system("service mountd onestatus && { service mountd onestop && touch mountd_running ; }"));
+	ATF_REQUIRE_EQ(0, system("echo $PWD -mapall=root 192.168.56.105 > NFSAuditExports && mountd NFSAuditExports"));
 	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
 	    { service nfsd onestart && touch started_nfsd ; }"));
+	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
 	url.server = SERVER;
-	url.path = EXPORT;
+	url.path = cwd;
 	ATF_REQUIRE_MSG(nfs_mount(nfs, url.server, url.path) == 0, "Failed to mount nfs share");
 	return nfs;
 }

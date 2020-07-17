@@ -15,11 +15,10 @@
 #include <nfsc/libnfs-raw-portmap.h>
 
 struct au_rpc_data {
-	char*	file_path;
+//	char*	file_path;
 	int	au_rpc_status;
 	int	au_rpc_result; /* RPC result status/error. refer: libnfs-raw-nfs.h */
 	int	au_rpc_event;
-	int	au_test_nature;
 	int	is_finished;
 };
 struct nfs_fh {
@@ -43,12 +42,11 @@ struct nfs_context {
 };
 
 static char *SERVER = "192.168.56.105";
-static char *EXPORT = "/mnt/NFS_audit_test";
 static struct pollfd fds[1];
 static mode_t mode = 0777;
 static const char *auclass = "nfs";
 
-struct nfs_context *tc_body_init(int, int, struct au_rpc_data*);
+struct nfs_context *tc_body_init(int, struct au_rpc_data*);
 void nfs_res_close_cb(struct nfs_context*, int, void*, void*);
 int nfs_poll_fd(struct nfs_context*, struct au_rpc_data*);
 void check_audit(struct pollfd [], const char *, FILE *);
