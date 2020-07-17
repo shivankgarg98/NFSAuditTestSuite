@@ -41,7 +41,7 @@ struct nfs_context {
 	int	mountport;
 };
 
-static char *SERVER = "192.168.56.105";
+static char *SERVER = "127.1";
 static struct pollfd fds[1];
 static mode_t mode = 0777;
 static const char *auclass = "nfs";

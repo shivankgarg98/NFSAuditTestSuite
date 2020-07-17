@@ -259,7 +259,7 @@ struct nfs_context
 	au_test_data->au_rpc_result = -1;
 	au_test_data->is_finished = 0;
 	ATF_REQUIRE_EQ(0, system("service mountd onestatus && { service mountd onestop && touch mountd_running ; }"));
-	ATF_REQUIRE_EQ(0, system("echo $PWD -mapall=root 192.168.56.105 > NFSAuditExports && mountd NFSAuditExports"));
+	ATF_REQUIRE_EQ(0, system("echo $PWD -mapall=root 127.1 > NFSAuditExports && mountd NFSAuditExports"));
 	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
 	    { service nfsd onestart && touch started_nfsd ; }"));
 	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
