@@ -14,16 +14,32 @@
 #include <nfsc/libnfs-raw-nfs.h>
 #include <nfsc/libnfs-raw-portmap.h>
 
-struct client {
-	char	*server;
-	char	*export;
-	uint32_t	mount_port;
+struct au_rpc_data {
+	char*	file_path;
 	int	au_rpc_status;
 	int	au_rpc_result; /* RPC result status/error. refer: libnfs-raw-nfs.h */
 	int	au_rpc_event;
 	int	au_test_nature;
 	int	is_finished;
-	struct	nfs_fh3 rootfh;
+};
+struct nfs_fh {
+	int len;
+	char *val;
+};
+struct nfs_context {
+	struct	rpc_context *rpc;
+	char	*server;
+	char	*export;
+	struct nfs_fh	rootfh;
+	uint64_t	readmax;
+	uint64_t	writemax;
+	char*	cwd;
+	int	auto_reconnect;
+	uint16_t	mask;
+
+	int	version;
+	int	nfsport;
+	int	mountport;
 };
 
 static char *SERVER = "192.168.56.105";
@@ -32,11 +48,9 @@ static struct pollfd fds[1];
 static mode_t mode = 0777;
 static const char *auclass = "nfs";
 
-int nfs_poll_fd(struct rpc_context *, struct client *);
-void nfs_setup(struct rpc_context *, void *);
-void nfs_destroy(struct rpc_context *);
-
-void tc_body_helper(int, int, char *);
+struct nfs_context *tc_body_init(int, int, struct au_rpc_data*);
+void nfs_res_close_cb(struct nfs_context*, int, void*, void*);
+int nfs_poll_fd(struct nfs_context*, struct au_rpc_data*);
 void check_audit(struct pollfd [], const char *, FILE *);
 FILE *setup(struct pollfd [], const char *);
 void cleanup(void);
@@ -71,8 +85,5 @@ void cleanup(void);
 #define AUE_NFS3RPC_FSINFO	43284
 #define AUE_NFS3RPC_PATHCONF	43285
 #define AUE_NFS3RPC_COMMIT	43286
-
-
-
 
 #endif

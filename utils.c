@@ -244,41 +244,33 @@ cleanup(void)
 		system("service auditd onestop > /dev/null 2>&1");
 }
 
-void tc_body_helper(int au_rpc_event, int tc_type, char *regex)
+struct nfs_context
+*tc_body_init(int au_rpc_event, int tc_type, struct au_rpc_data* au_test_data)
 {
-	FILE *pipefd = setup(fds, auclass);
-	struct rpc_context *rpc;
-	struct client client;
+	struct nfs_context *nfs;
+	struct nfs_url url;
 
-	client.server = SERVER;
-	client.export = EXPORT;
-	client.au_rpc_status = -1;
-	client.au_rpc_result = -1;
-	client.is_finished = 0;
-	client.au_test_nature = tc_type;
-	client.au_rpc_event = au_rpc_event;
-	rpc = rpc_init_context();
-	nfs_setup(rpc, &client);
-
-	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(rpc, &client));
-	nfs_destroy(rpc);
-
-	switch (tc_type) {
-	case SUCCESS: 
-		ATF_REQUIRE(NFS3_OK == client.au_rpc_result);
-		break;
-	case FAILURE:
-		ATF_REQUIRE(NFS3_OK != client.au_rpc_result);
-		break;
-	}
-	check_audit(fds, regex, pipefd);
+	nfs = nfs_init_context();
+	ATF_REQUIRE(nfs != NULL);
+	au_test_data->au_rpc_event = au_rpc_event;
+	au_test_data->au_rpc_status = -1;
+	au_test_data->au_rpc_result = -1;
+	au_test_data->au_test_nature = tc_type;
+	au_test_data->file_path = client_path;
+	au_test_data->is_finished = 0;
+	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
+	    { service nfsd onestart && touch started_nfsd ; }"));
+	url.server = SERVER;
+	url.path = EXPORT;
+	ATF_REQUIRE_MSG(nfs_mount(nfs, url.server, url.path) == 0, "Failed to mount nfs share");
+	return nfs;
 }
 
 int
-nfs_poll_fd(struct rpc_context *rpc, struct client *client)
+nfs_poll_fd(struct nfs_context *nfs, struct au_rpc_data *au_test_data)
 {
 	struct pollfd pfd;
-	
+	struct rpc_context *rpc = nfs_get_rpc_context(nfs);	
 	for (;;) {
 		pfd.fd = rpc_get_fd(rpc);
 		pfd.events = rpc_which_events(rpc);
@@ -292,22 +284,21 @@ nfs_poll_fd(struct rpc_context *rpc, struct client *client)
 			atf_tc_fail("rpc_service failed");
 			break;
 		}
-		if (client->is_finished) {
+		if (au_test_data->is_finished) {
 			break;
 		}
 	}
 	
-	return client->au_rpc_status;
-
+	return au_test_data->au_rpc_status;
 }
 
-static void
-nfs_res_close_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
+void
+nfs_res_close_cb(struct nfs_context *nfs, int status, void *data, void *private_data)
 {
-	struct client *client = private_data;
-	switch (client->au_rpc_event) {
+	struct au_rpc_data* au_test_data = (struct au_rpc_data *)private_data;
+	switch (au_test_data->au_rpc_event) {
 	case AUE_NFS3RPC_GETATTR:
-		client->au_rpc_result = ((GETATTR3res *)data)->status;
+		au_test_data->au_rpc_result = ((GETATTR3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_SETATTR:
 		break;
@@ -320,10 +311,10 @@ nfs_res_close_cb(struct rpc_context *rpc, int status, void *data, void *private_
 	case AUE_NFS3RPC_READ:
 		break;
 	case AUE_NFS3RPC_CREATE:
-		client->au_rpc_result = ((CREATE3res *)data)->status;
+		au_test_data->au_rpc_result = ((CREATE3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_MKDIR:
-		client->au_rpc_result = ((MKDIR3res *)data)->status;
+		au_test_data->au_rpc_result = ((MKDIR3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_WRITE:
 		break;
@@ -354,257 +345,7 @@ nfs_res_close_cb(struct rpc_context *rpc, int status, void *data, void *private_
 	default:
 		ATF_REQUIRE_EQ(1,0);
 	}
-	client->au_rpc_status = status;
-	client->is_finished = 1;
+	au_test_data->au_rpc_status = status;
+	au_test_data->is_finished = 1;
 	printf("complete\n");
-}
-
-static void
-nfs_connect_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-
-	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, status);
-
-	printf("Connected to RPC.NFSD on %s:%d\n", client->server, client->mount_port);
-	
-	switch (client->au_rpc_event) {
-	case AUE_NFS3RPC_GETATTR:
-	{
-		GETATTR3args args;
-		args.object = client->rootfh;
-		ATF_REQUIRE_EQ(0, rpc_nfs3_getattr_async(rpc, nfs_res_close_cb, &args, client));
-		break;
-	}
-	case AUE_NFS3RPC_SETATTR:
-	{
-		break;
-	}
-	case AUR_NFS3RPC_LOOKUP:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_ACCESS:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_READLINK:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_READ:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_WRITE:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_CREATE:
-	{
-		CREATE3args args;
-		args.where.dir = client->rootfh;
-		args.where.name = client_path;
-		args.how.mode = GUARDED; /* Similiar to case if O_EXCL flag is provided with O_CREAT. */
-		args.how.createhow3_u.obj_attributes.mode.set_it = 1;
-		args.how.createhow3_u.obj_attributes.mode.set_mode3_u.mode = 0777;
-		ATF_REQUIRE_EQ(0, rpc_nfs3_create_async(rpc, nfs_res_close_cb, &args, client));
-		break;
-	}
-	case AUE_NFS3RPC_MKDIR:
-	{
-		MKDIR3args args;
-		args.where.dir = client->rootfh;
-		args.where.name = client_path;
-		args.attributes.mode.set_it = 1;
-		args.attributes.mode.set_mode3_u.mode = 0777;
-		ATF_REQUIRE_EQ(0, rpc_nfs3_mkdir_async(rpc, nfs_res_close_cb, &args, client));
-		break;
-	}
-	case AUE_NFS3RPC_SYMLINK:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_MKNOD:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_REMOVE:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_RMDIR:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_RENAME:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_LINK:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_READDIR:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_READDIRPLUS:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_FSSTAT:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_FSINFO:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_PATHCONF:
-	{
-		break;
-	}
-	case AUE_NFS3RPC_COMMIT:
-	{
-		break;
-	}
-	default:
-		ATF_REQUIRE_EQ(0, 1);
-	}
-}
-
-static void
-mount_mnt_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-	mountres3 *mnt = data;
-
-	ATF_REQUIRE_MSG(status != RPC_STATUS_ERROR, "mount/mnt call failed with \"%s\"", (char *)data);
-	ATF_REQUIRE_MSG(status == RPC_STATUS_SUCCESS, "mount/mnt call to server %s failed, status:%d", client->server, status);
-
-	client->rootfh.data.data_len = mnt->mountres3_u.mountinfo.fhandle.fhandle3_len;
-        client->rootfh.data.data_val = malloc(client->rootfh.data.data_len);
-	memcpy(client->rootfh.data.data_val, mnt->mountres3_u.mountinfo.fhandle.fhandle3_val, client->rootfh.data.data_len);
-
-	ATF_REQUIRE_MSG(rpc_disconnect(rpc, "normal disconnect") == 0, "Failed to disconnect socket to mountd");
-
-	ATF_REQUIRE_MSG(rpc_connect_async(rpc, client->server, 2049, nfs_connect_cb, client) == 0, "Failed to start connection");
-}
-
-static void
-mount_export_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-	exports export = *(exports *)data;
-
-	ATF_REQUIRE_MSG(status != RPC_STATUS_ERROR, "mount null call failed with \"%s\"", (char *)data);
-	ATF_REQUIRE_MSG(status == RPC_STATUS_SUCCESS, "mount null call to server %s failed, status:%d", client->server, status);
-
-	while (export != NULL) {
-		printf("Export: %s\n", export->ex_dir);
-		export = export->ex_next;
-	}
-	printf("Send MOUNT/MNT command for %s\n", client->export);
-	ATF_REQUIRE_MSG(rpc_mount_mnt_async(rpc, mount_mnt_cb, client->export, client) == 0, "Failed to send mnt request");
-}
-
-static void
-mount_null_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-
-	ATF_REQUIRE_MSG(status != RPC_STATUS_ERROR, "mount null call failed with \"%s\"", (char *)data);
-	ATF_REQUIRE_MSG(status == RPC_STATUS_SUCCESS, "mount null call to server %s failed, status:%d", client->server, status);
-
-	ATF_REQUIRE_MSG(rpc_mount_export_async(rpc, mount_export_cb, client) == 0, "Failed to send export request");
-}
-
-static void
-mount_connect_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-
-	ATF_REQUIRE_MSG(status == RPC_STATUS_SUCCESS, "connection to RPC.MOUNTD on server %s failed", client->server);
-
-	ATF_REQUIRE_MSG(rpc_mount_null_async(rpc, mount_null_cb, client) == 0, "Failed to send null request");
-}
-
-static void
-pmap_getport2_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-
-	ATF_REQUIRE_MSG(status != RPC_STATUS_ERROR, "portmapper getport call failed with \"%s\"", (char *)data);
-       	ATF_REQUIRE_MSG(status == RPC_STATUS_SUCCESS, "portmapper getport call to server %s failed, status:%d", client->server, status);
-
-	client->mount_port = *(uint32_t *)data;
-	ATF_REQUIRE_MSG(client->mount_port != 0, "RPC.MOUNTD is not available on server : %s:%d", client->server, client->mount_port);
-
-	ATF_REQUIRE_MSG(rpc_disconnect(rpc, "normal disconnect") == 0, "Failed to disconnect socket to portmapper");
-
-	ATF_REQUIRE_MSG(rpc_connect_async(rpc, client->server, client->mount_port, mount_connect_cb, client) == 0, "Failed to start connection");
-}
-
-static void
-pmap_dump_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-	struct pmap2_dump_result *dr = data;
-	struct pmap2_mapping_list *list = dr->list;
-
-	ATF_REQUIRE_MSG(status != RPC_STATUS_ERROR, "portmapper null call failed with \"%s\"", (char *)data);
-	ATF_REQUIRE_MSG(status == RPC_STATUS_SUCCESS, "portmapper null call to server %s failed, status:%d\n", client->server, status);
-
-	while (list) {
-		printf("Prog:%d Vers:%d Protocol:%d Port:%d\n",
-			list->map.prog,
-			list->map.vers,
-			list->map.prot,
-			list->map.port);
-		list = list->next;
-	}
-
-	ATF_REQUIRE_MSG(rpc_pmap2_getport_async(rpc, MOUNT_PROGRAM, MOUNT_V3, IPPROTO_TCP, pmap_getport2_cb, client) == 0, "Failed to send getport request");
-}
-
-static void
-pmap_null_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-
-	ATF_REQUIRE_MSG(status != RPC_STATUS_ERROR, "portmapper null call failed with \"%s\"", (char *)data);
-	ATF_REQUIRE_MSG(status == RPC_STATUS_SUCCESS, "portmapper null call to server %s failed, status:%d", client->server, status);
-
-	ATF_REQUIRE_MSG(rpc_pmap2_dump_async(rpc, pmap_dump_cb, client) == 0, "Failed to send getport request");
-}
-
-static void
-pmap_connect_cb(struct rpc_context *rpc, int status, void *data, void *private_data)
-{
-	struct client *client = private_data;
-
-	ATF_REQUIRE_MSG(status == RPC_STATUS_SUCCESS, "connection to portmapper on server %s failed", client->server);
-	ATF_REQUIRE_MSG(rpc_pmap2_null_async(rpc, pmap_null_cb, client) == 0, "Failed to send null request");
-}
-
-void
-nfs_setup(struct rpc_context *rpc, void *private_data)
-{
-	struct client *client = private_data;
-
-	ATF_REQUIRE(rpc != NULL);
-
-	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
-	{ service nfsd onestart && touch started_nfsd ; }"));
-
-	ATF_REQUIRE_MSG(rpc_connect_async(rpc, client->server, 111, pmap_connect_cb, client) == 0, "Failed to start connection");
-}
-
-void
-nfs_destroy(struct rpc_context *rpc)
-{
-
-	rpc_destroy_context(rpc);
-	rpc = NULL;
 }
