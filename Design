@@ -8,4 +8,4 @@ DONE -Reduce code duplicacy while writing test body. Looking for some way to do 
 	a.) I assume the RPC executes successfully. (i.e. the status == RPC_STATUS_SUCCESS). If not, the test case fails.
 	b.) Now, when the RPC have been executed. The RPC result status may be NFS3_OK or some error. NFS3_OK indicates the RPC have successfully done its work. For instance, if the directoy already exists in mkdir case, the status rpc_cb will be RPC_STATUS_SUCCESS and (MKDIR3res *)res->status will not be NFS3_OK and some error.
 	c.) For the success scenarios, the above testing is clear and simple. But In case of failure, we can fail the RPC in many ways. Should I also include the case where RPC fails (possibly due to invalid arguemnts and result in RPC_STATUS_ERROR)?
-5. Problems with the design described in Point 4. I'm unable to find the failure cases with res != NFS3_OK. (like case of getattr)
+DONE -Problems with the design described in Point 4. I'm unable to find the failure cases with res != NFS3_OK. (like case of getattr) - SOLVED

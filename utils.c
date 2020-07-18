@@ -258,7 +258,7 @@ struct nfs_context
 	au_test_data->au_rpc_status = -1;
 	au_test_data->au_rpc_result = -1;
 	au_test_data->is_finished = 0;
-	ATF_REQUIRE_EQ(0, system("service mountd onestatus && { service mountd onestop && touch mountd_running ; }"));
+	ATF_REQUIRE_EQ(0, system(" ! { service mountd onestatus ; } || { service mountd onestop && touch mountd_running ; }"));
 	ATF_REQUIRE_EQ(0, system("echo $PWD -mapall=root 127.1 > NFSAuditExports && mountd NFSAuditExports"));
 	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
 	    { service nfsd onestart && touch started_nfsd ; }"));
@@ -266,6 +266,7 @@ struct nfs_context
 	url.server = SERVER;
 	url.path = cwd;
 	ATF_REQUIRE_MSG(nfs_mount(nfs, url.server, url.path) == 0, "Failed to mount nfs share");
+
 	return nfs;
 }
 
@@ -274,24 +275,19 @@ nfs_poll_fd(struct nfs_context *nfs, struct au_rpc_data *au_test_data)
 {
 	struct pollfd pfd;
 	struct rpc_context *rpc = nfs_get_rpc_context(nfs);	
+
 	for (;;) {
 		pfd.fd = rpc_get_fd(rpc);
 		pfd.events = rpc_which_events(rpc);
-
-		if (poll(&pfd, 1, -1) < 0) {
-			atf_tc_fail("poll failed");
-			exit(10);
-		}
-
+		ATF_REQUIRE_MSG(poll(&pfd, 1, -1) >= 0, "poll failed");
 		if (rpc_service(rpc, pfd.revents) < 0) {
 			atf_tc_fail("rpc_service failed");
 			break;
 		}
-		if (au_test_data->is_finished) {
+		if (au_test_data->is_finished)
 			break;
-		}
 	}
-	
+
 	return au_test_data->au_rpc_status;
 }
 
@@ -299,19 +295,25 @@ void
 nfs_res_close_cb(struct nfs_context *nfs, int status, void *data, void *private_data)
 {
 	struct au_rpc_data* au_test_data = (struct au_rpc_data *)private_data;
+
 	switch (au_test_data->au_rpc_event) {
 	case AUE_NFS3RPC_GETATTR:
 		au_test_data->au_rpc_result = ((GETATTR3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_SETATTR:
+		au_test_data->au_rpc_result = ((SETATTR3res *)data)->status;
 		break;
 	case AUR_NFS3RPC_LOOKUP:
+		au_test_data->au_rpc_result = ((LOOKUP3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_ACCESS:
+		au_test_data->au_rpc_result = ((ACCESS3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_READLINK:
+		au_test_data->au_rpc_result = ((READLINK3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_READ:
+		au_test_data->au_rpc_result = ((READ3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_CREATE:
 		au_test_data->au_rpc_result = ((CREATE3res *)data)->status;
@@ -320,30 +322,43 @@ nfs_res_close_cb(struct nfs_context *nfs, int status, void *data, void *private_
 		au_test_data->au_rpc_result = ((MKDIR3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_WRITE:
+		au_test_data->au_rpc_result = ((WRITE3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_SYMLINK:
+		au_test_data->au_rpc_result = ((SYMLINK3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_MKNOD:
+		au_test_data->au_rpc_result = ((MKNOD3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_REMOVE:
+		au_test_data->au_rpc_result = ((REMOVE3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_RMDIR:
+		au_test_data->au_rpc_result = ((RMDIR3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_RENAME:
+		au_test_data->au_rpc_result = ((RENAME3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_LINK:
+		au_test_data->au_rpc_result = ((LINK3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_READDIR:
+		au_test_data->au_rpc_result = ((READDIR3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_READDIRPLUS:
+		au_test_data->au_rpc_result = ((READDIRPLUS3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_FSSTAT:
+		au_test_data->au_rpc_result = ((FSSTAT3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_FSINFO:
+		au_test_data->au_rpc_result = ((FSINFO3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_PATHCONF:
+		au_test_data->au_rpc_result = ((PATHCONF3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_COMMIT:
+		au_test_data->au_rpc_result = ((COMMIT3res *)data)->status;
 		break;
 	default:
 		ATF_REQUIRE_EQ(1,0);
