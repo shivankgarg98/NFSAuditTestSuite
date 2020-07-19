@@ -303,7 +303,7 @@ nfs_res_close_cb(struct nfs_context *nfs, int status, void *data, void *private_
 	case AUE_NFS3RPC_SETATTR:
 		au_test_data->au_rpc_result = ((SETATTR3res *)data)->status;
 		break;
-	case AUR_NFS3RPC_LOOKUP:
+	case AUE_NFS3RPC_LOOKUP:
 		au_test_data->au_rpc_result = ((LOOKUP3res *)data)->status;
 		break;
 	case AUE_NFS3RPC_ACCESS:
