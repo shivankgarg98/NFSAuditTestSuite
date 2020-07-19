@@ -82,6 +82,7 @@ ATF_TC_BODY(nfs3_getattr_failure, tc)
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
+
 ATF_TC_CLEANUP(nfs3_getattr_failure, tc)
 {
 	cleanup();
@@ -93,6 +94,7 @@ ATF_TC_HEAD(nfs3_setattr_success, tc)
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"NFSv3 setattr RPC");
 }
+
 ATF_TC_BODY(nfs3_setattr_success, tc)
 {
 	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
@@ -118,6 +120,7 @@ ATF_TC_BODY(nfs3_setattr_success, tc)
 	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
+
 ATF_TC_CLEANUP(nfs3_setattr_success, tc)
 {
 	cleanup();
@@ -975,6 +978,523 @@ ATF_TC_CLEANUP(nfs3_rename_failure, tc)
 	cleanup();
 }
 
+ATF_TC_WITH_CLEANUP(nfs3_link_success);
+ATF_TC_HEAD(nfs3_link_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv3 link RPC");
+}
+
+ATF_TC_BODY(nfs3_link_success, tc)
+{
+	ATF_REQUIRE(open("ATestFile", O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	LINK3args args;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_LINK, &au_test_data);
+	
+	ATF_REQUIRE(nfs_open(nfs, "ATestFile", O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+
+	pipefd = setup(fds, auclass);
+	args.file = *fh3;
+	args.link.dir.data.data_len = nfs->rootfh.len;
+	args.link.dir.data.data_val = nfs->rootfh.val;
+	args.link.name = path;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_link_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_link_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_link_failure);
+ATF_TC_HEAD(nfs3_link_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv3 link RPC");
+}
+
+ATF_TC_BODY(nfs3_link_failure, tc)
+{
+	ATF_REQUIRE(open("ATestFile", O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	LINK3args args;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_LINK, &au_test_data);
+	
+	ATF_REQUIRE(nfs_open(nfs, "ATestFile", O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	/* Create a file with same name so that link throws an error. */
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+	pipefd = setup(fds, auclass);
+	args.file = *fh3;
+	args.link.dir.data.data_len = nfs->rootfh.len;
+	args.link.dir.data.data_val = nfs->rootfh.val;
+	args.link.name = path;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_link_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_link_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_readdir_success);
+ATF_TC_HEAD(nfs3_readdir_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv3 readdir RPC");
+}
+
+ATF_TC_BODY(nfs3_readdir_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_READDIR, &au_test_data);
+	FILE *pipefd = setup(fds, auclass);	
+	READDIR3args args;
+	const char *regex = "nfsrvd_readdir.*return,success";
+
+	args.dir.data.data_len = nfs->rootfh.len;
+	args.dir.data.data_val = nfs->rootfh.val;
+	args.cookie = 0;
+	memset(&args.cookieverf, 0, sizeof(cookieverf3));
+	args.count = 8192;
+
+	ATF_REQUIRE(rpc_nfs3_readdir_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data) == 0);
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_readdir_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_readdir_failure);
+ATF_TC_HEAD(nfs3_readdir_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv3 readdir RPC");
+}
+
+ATF_TC_BODY(nfs3_readdir_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_READDIR, &au_test_data);
+	FILE *pipefd = setup(fds, auclass);	
+	READDIR3args args;
+	const char *regex = "nfsrvd_readdir.*return,failure";
+
+	args.dir.data.data_len = nfs->rootfh.len;
+	args.dir.data.data_val = nfs->rootfh.val;
+	args.cookie = -1; /* Bad cookie value throws an error. */
+	memset(&args.cookieverf, 0, sizeof(cookieverf3));
+	args.count = 8192;
+
+	ATF_REQUIRE(rpc_nfs3_readdir_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data) == 0);
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_readdir_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_readdirplus_success);
+ATF_TC_HEAD(nfs3_readdirplus_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv3 readdirplus RPC");
+}
+
+ATF_TC_BODY(nfs3_readdirplus_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_READDIRPLUS, &au_test_data);
+	FILE *pipefd = setup(fds, auclass);	
+	READDIRPLUS3args args;
+	const char *regex = "nfsrvd_readdirplus.*return,success";
+
+	args.dir.data.data_len = nfs->rootfh.len;
+	args.dir.data.data_val = nfs->rootfh.val;
+	args.cookie = 0;
+	memset(&args.cookieverf, 0, sizeof(cookieverf3));
+	args.dircount = 8192;
+	args.maxcount = 8192;
+
+	ATF_REQUIRE(rpc_nfs3_readdirplus_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data) == 0);
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_readdirplus_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_readdirplus_failure);
+ATF_TC_HEAD(nfs3_readdirplus_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv3 readdirplus RPC");
+}
+
+ATF_TC_BODY(nfs3_readdirplus_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_READDIRPLUS, &au_test_data);
+	FILE *pipefd = setup(fds, auclass);	
+	READDIRPLUS3args args;
+	const char *regex = "nfsrvd_readdirplus.*return,failure";
+
+	args.dir.data.data_len = nfs->rootfh.len;
+	args.dir.data.data_val = nfs->rootfh.val;
+	args.cookie = -1; /* Bad cookie value throws an error. */
+	memset(&args.cookieverf, 0, sizeof(cookieverf3));
+	args.dircount = 8192;
+	args.maxcount = 8192;
+
+	ATF_REQUIRE(rpc_nfs3_readdirplus_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data) == 0);
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_readdirplus_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_fsstat_success);
+ATF_TC_HEAD(nfs3_fsstat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv3 fsstat RPC");
+}
+
+ATF_TC_BODY(nfs3_fsstat_success, tc)
+{
+	ATF_REQUIRE_EQ(0, mkdir(path, 0755));
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	FSSTAT3args args;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_FSSTAT, &au_test_data);
+	const char *regex = "nfsrvd_statfs.*return,success";
+
+	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	pipefd = setup(fds, auclass);
+
+	args.fsroot = *fh3;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_fsstat_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_fsstat_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_fsstat_failure);
+ATF_TC_HEAD(nfs3_fsstat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv3 fsstat RPC");
+}
+
+ATF_TC_BODY(nfs3_fsstat_failure, tc)
+{
+	ATF_REQUIRE_EQ(0, mkdir(path, 0755));
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	FSSTAT3args args;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_FSSTAT, &au_test_data);
+	const char *regex = "nfsrvd_statfs.*return,failure";
+
+	/* Remove the directory to get a stale file handle error. */
+	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE(remove(path) == 0);
+	pipefd = setup(fds, auclass);
+	
+	args.fsroot = *fh3;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_fsstat_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_fsstat_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_fsinfo_success);
+ATF_TC_HEAD(nfs3_fsinfo_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv3 fsinfo RPC");
+}
+
+ATF_TC_BODY(nfs3_fsinfo_success, tc)
+{
+	ATF_REQUIRE_EQ(0, mkdir(path, 0755));
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	FSINFO3args args;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_FSINFO, &au_test_data);
+	const char *regex = "nfsrvd_fsinfo.*return,success";
+
+	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	pipefd = setup(fds, auclass);
+
+	args.fsroot = *fh3;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_fsinfo_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_fsinfo_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_fsinfo_failure);
+ATF_TC_HEAD(nfs3_fsinfo_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv3 fsinfo RPC");
+}
+
+ATF_TC_BODY(nfs3_fsinfo_failure, tc)
+{
+	ATF_REQUIRE_EQ(0, mkdir(path, 0755));
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	FSINFO3args args;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_FSINFO, &au_test_data);
+	const char *regex = "nfsrvd_fsinfo.*return,failure";
+
+	/* Remove the directory to get a stale file handle error. */
+	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE(remove(path) == 0);
+	pipefd = setup(fds, auclass);
+	
+	args.fsroot = *fh3;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_fsinfo_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_fsinfo_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_pathconf_success);
+ATF_TC_HEAD(nfs3_pathconf_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv3 pathconf RPC");
+}
+
+ATF_TC_BODY(nfs3_pathconf_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	PATHCONF3args args;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_PATHCONF, &au_test_data);
+	const char *regex = "nfsrvd_pathconf.*return,success";
+
+	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+
+	pipefd = setup(fds, auclass);
+
+	args.object = *fh3;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_pathconf_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_pathconf_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_pathconf_failure);
+ATF_TC_HEAD(nfs3_pathconf_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv3 pathconf RPC");
+}
+
+ATF_TC_BODY(nfs3_pathconf_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	PATHCONF3args args;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_PATHCONF, &au_test_data);
+	const char *regex = "nfsrvd_pathconf.*return,failure";
+
+	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+
+	/* Remove the file. The resulting error is Stale NFS file handle. */
+	ATF_REQUIRE(remove(path) == 0);
+	pipefd = setup(fds, auclass);
+
+	args.object = *fh3;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_pathconf_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_pathconf_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_commit_success);
+ATF_TC_HEAD(nfs3_commit_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv3 commit RPC");
+}
+
+ATF_TC_BODY(nfs3_commit_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	COMMIT3args args;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_COMMIT, &au_test_data);
+	const char *regex = "nfsrvd_commit.*return,success";
+
+	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+
+	pipefd = setup(fds, auclass);
+
+	args.file = *fh3;
+	args.offset = 0;
+	args.count = 0;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_commit_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_commit_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs3_commit_failure);
+ATF_TC_HEAD(nfs3_commit_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv3 commit RPC");
+}
+
+ATF_TC_BODY(nfs3_commit_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	COMMIT3args args;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_fh3 *fh3;
+	struct nfs_context* nfs = tc_body_init(AUE_NFS3RPC_COMMIT, &au_test_data);
+	const char *regex = "nfsrvd_commit.*return,failure";
+
+	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
+	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE(remove(path) == 0);
+	pipefd = setup(fds, auclass);
+
+	args.file = *fh3;
+	args.offset = 0;
+	args.count = 0;
+	ATF_REQUIRE_EQ(0, rpc_nfs3_commit_async(nfs->rpc, (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+
+	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs3_commit_failure, tc)
+{
+	cleanup();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, nfs3_getattr_success);//done
@@ -1005,20 +1525,20 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, nfs3_rmdir_failure);//done
 	ATF_TP_ADD_TC(tp, nfs3_rename_success);//done
 	ATF_TP_ADD_TC(tp, nfs3_rename_failure);//done
-/*	ATF_TP_ADD_TC(tp, nfs3_link_success);
-	ATF_TP_ADD_TC(tp, nfs3_link_failure);
-	ATF_TP_ADD_TC(tp, nfs3_readdir_success);
-	ATF_TP_ADD_TC(tp, nfs3_readdir_failure);
-	ATF_TP_ADD_TC(tp, nfs3_readdirplus_success);
-	ATF_TP_ADD_TC(tp, nfs3_readdirplus_failure);
-	ATF_TP_ADD_TC(tp, nfs3_fsstat_success);
-	ATF_TP_ADD_TC(tp, nfs3_fsstat_failure);
-	ATF_TP_ADD_TC(tp, nfs3_fsinfo_success);
-	ATF_TP_ADD_TC(tp, nfs3_fsinfo_failure);
-	ATF_TP_ADD_TC(tp, nfs3_pathconf_success);
-	ATF_TP_ADD_TC(tp, nfs3_pathconf_failure);
-	ATF_TP_ADD_TC(tp, nfs3_commit_success);
-	ATF_TP_ADD_TC(tp, nfs3_commit_failure);
-*/
+	ATF_TP_ADD_TC(tp, nfs3_link_success);//done
+	ATF_TP_ADD_TC(tp, nfs3_link_failure);//done
+	ATF_TP_ADD_TC(tp, nfs3_readdir_success);//done
+	ATF_TP_ADD_TC(tp, nfs3_readdir_failure);//done
+	ATF_TP_ADD_TC(tp, nfs3_readdirplus_success);//done
+	ATF_TP_ADD_TC(tp, nfs3_readdirplus_failure);//done
+	ATF_TP_ADD_TC(tp, nfs3_fsstat_success);//done
+	ATF_TP_ADD_TC(tp, nfs3_fsstat_failure);//done
+	ATF_TP_ADD_TC(tp, nfs3_fsinfo_success);//done
+	ATF_TP_ADD_TC(tp, nfs3_fsinfo_failure);//done
+	ATF_TP_ADD_TC(tp, nfs3_pathconf_success);//done
+	ATF_TP_ADD_TC(tp, nfs3_pathconf_failure);//done
+	ATF_TP_ADD_TC(tp, nfs3_commit_success);//done
+	ATF_TP_ADD_TC(tp, nfs3_commit_failure);//done
+
 	return (atf_no_error());
 }
