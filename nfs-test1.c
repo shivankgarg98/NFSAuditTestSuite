@@ -303,24 +303,19 @@ ATF_TC_HEAD(nfs3_readlink_success, tc)
 
 ATF_TC_BODY(nfs3_readlink_success, tc)
 {
-	ATF_REQUIRE(symlink("symlink", path) == 0);
+	ATF_REQUIRE(symlink(path, "symlink") == 0);
 
-	struct nfs_fh3 *fh3;
-	struct nfsfh *nfsfh = NULL;
 	struct au_rpc_data au_test_data;
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_READLINK, &au_test_data);
-	FILE *pipefd;	
-	READLINK3args args;
-	
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDWR, &nfsfh) == 0);
-	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	FILE *pipefd;
+	char buf[PATH_MAX];
+	const char *regex = "nfsrvd_readlink.*return,success";
+
+	nfs->version = NFS_V3;
 	pipefd = setup(fds, auclass);
-	args.symlink = *fh3;
-	ATF_REQUIRE(rpc_nfs3_readlink_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
-	check_audit(fds, successreg, pipefd);
+	ATF_REQUIRE(nfs_readlink(nfs, "symlink", buf, sizeof(buf)) == 0);
+	ATF_REQUIRE_MATCH(buf, path);
+	check_audit(fds, regex, pipefd);
 }
 
 ATF_TC_CLEANUP(nfs3_readlink_success, tc)
@@ -337,7 +332,19 @@ ATF_TC_HEAD(nfs3_readlink_failure, tc)
 
 ATF_TC_BODY(nfs3_readlink_failure, tc)
 {
-	ATF_REQUIRE_MSG(1==0, "readlink success is failing too due to nfs_open");
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_READLINK, &au_test_data);
+	FILE *pipefd;
+	char buf[PATH_MAX];
+	const char *regex = "nfsrvd_readlink.*return,failure";
+
+	/* The path is regular file not symlink, readlink results in error. */
+	nfs->version = NFS_V3;
+	pipefd = setup(fds, auclass);
+	ATF_REQUIRE(nfs_readlink(nfs, path, buf, sizeof(buf)) != 0);
+	check_audit(fds, regex, pipefd);
 }
 
 ATF_TC_CLEANUP(nfs3_readlink_failure, tc)
