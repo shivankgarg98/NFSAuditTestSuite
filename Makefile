@@ -1,5 +1,5 @@
-TESTSDIR=	${LOCALBASE}/tests/nfs-audit
-
+TESTSDIR=${LOCALBASE}/tests/nfs-audit
+BINDIR=${TESTSDIR}	
 PROG=	nfs-test1
 
 SRCS+=	nfs-test1.c

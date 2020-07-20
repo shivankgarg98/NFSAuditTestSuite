@@ -1,11 +1,21 @@
 TEST CASES FOR NFS AUDIT
 
+XXX: SOME WEIRD PROBLEM WITH AUDIT LOG
+**** Ist record(after system rebooted) fail to appear in the audit trail. This lead to failure of first test case always(on first run after start) as it can't regex match in record string. ****
+
+
+
+My Current Test Design:
+	a.) I assume the RPC executes successfully. (i.e. the status == RPC_STATUS_SUCCESS). If not, the test case fails.
+	b.) Now, when the RPC have been executed. The RPC result status may be NFS3_OK or some error. NFS3_OK indicates the RPC have successfully done its work. For instance, if the directoy already exists in mkdir case, the status rpc_cb will be RPC_STATUS_SUCCESS and (MKDIR3res *)res->status will not be NFS3_OK and some error.
+	c.) For the success scenarios, the above testing is clear and simple. But In case of failure, we can fail the RPC in many ways. Should I also include the case where RPC fails (possibly due to invalid arguemnts and result in RPC_STATUS_ERROR)?
+
+
+xxxxxxxxxxxxxxx
 DONE -What and How should I export folder for NFS sharing? Currently, SERVER: 192.168.56.105 and EXPORT: /usr/shivank/home/audit_TEST_NFS, I wish to make it more generic and without affecting exports(5). -SOLVED Now it exports kyua temp subdirectory on 127.1 home
 
 DONE -How to exports the subdirectory in Kyua generated temp folder. Currently, I hardcode path values /etc/exports and same with ATF TEST CASE. Exporting the server directory through the ATF program will be more good.
 DONE -Reduce code duplicacy while writing test body. Looking for some way to do it. Currently I defiined a helper function which do the job pretty good.
-4. My Current Test Design:
-	a.) I assume the RPC executes successfully. (i.e. the status == RPC_STATUS_SUCCESS). If not, the test case fails.
-	b.) Now, when the RPC have been executed. The RPC result status may be NFS3_OK or some error. NFS3_OK indicates the RPC have successfully done its work. For instance, if the directoy already exists in mkdir case, the status rpc_cb will be RPC_STATUS_SUCCESS and (MKDIR3res *)res->status will not be NFS3_OK and some error.
-	c.) For the success scenarios, the above testing is clear and simple. But In case of failure, we can fail the RPC in many ways. Should I also include the case where RPC fails (possibly due to invalid arguemnts and result in RPC_STATUS_ERROR)?
 DONE -Problems with the design described in Point 4. I'm unable to find the failure cases with res != NFS3_OK. (like case of getattr) - SOLVED
+
+

@@ -287,6 +287,8 @@ nfs_poll_fd(struct nfs_context *nfs, struct au_rpc_data *au_test_data)
 		if (au_test_data->is_finished)
 			break;
 	}
+	nfs_umount(nfs);
+	nfs_destroy_context(nfs);
 
 	return au_test_data->au_rpc_status;
 }
