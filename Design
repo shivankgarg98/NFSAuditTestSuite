@@ -1,10 +1,12 @@
+Current status: 42/42 Test Case pass
 TEST CASES FOR NFS AUDIT
 
-XXX: SOME WEIRD PROBLEM WITH AUDIT LOG
+XXX: SOME WEIRD PROBLEM/BUG WITH AUDIT LOG
 **** Ist record(after system rebooted) fail to appear in the audit trail. This lead to failure of first test case always(on first run after start) as it can't regex match in record string. ****
 
+XXX: I was not able to supply a nfsfh to rpc_nfs3_readlink_async for symlink. So, I used high level api nfs_readlink to test the nfsrvd_readlink.
 
-
+XXX: vnode locking issues exists with NFS audit code. I checked it with libnfs/tests while auditd running. 
 My Current Test Design:
 	a.) I assume the RPC executes successfully. (i.e. the status == RPC_STATUS_SUCCESS). If not, the test case fails.
 	b.) Now, when the RPC have been executed. The RPC result status may be NFS3_OK or some error. NFS3_OK indicates the RPC have successfully done its work. For instance, if the directoy already exists in mkdir case, the status rpc_cb will be RPC_STATUS_SUCCESS and (MKDIR3res *)res->status will not be NFS3_OK and some error.
