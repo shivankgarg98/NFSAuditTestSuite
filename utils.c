@@ -25,9 +25,10 @@
  * $FreeBSD$
  */
 
+#include <sys/ioctl.h>
+
 #include <bsm/libbsm.h>
 #include <security/audit/audit_ioctl.h>
-#include <sys/ioctl.h>
 
 #include <atf-c.h>
 #include <errno.h>
@@ -38,6 +39,8 @@
 #include <unistd.h>
 
 #include "utils.h"
+
+static char SERVER[] = "127.1";
 
 /*
  * Checks the presence of "auditregex" in auditpipe(4) after the
@@ -267,7 +270,8 @@ struct nfs_context
 	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
 	url.server = SERVER;
 	url.path = cwd;
-	ATF_REQUIRE_MSG(nfs_mount(nfs, url.server, url.path) == 0, "Failed to mount nfs share");
+	ATF_REQUIRE_MSG(nfs_mount(nfs, url.server, url.path) == 0,
+	    "Failed to mount nfs share");
 
 	return nfs;
 }
@@ -296,7 +300,7 @@ nfs_poll_fd(struct nfs_context *nfs, struct au_rpc_data *au_test_data)
 }
 
 void
-nfs_res_close_cb(struct nfs_context *nfs, int status, void *data, void *private_data)
+nfs_res_close_cb(__unused struct nfs_context *nfs, int status, void *data, void *private_data)
 {
 	struct au_rpc_data* au_test_data = (struct au_rpc_data *)private_data;
 

@@ -1,13 +1,15 @@
-#ifndef _NFS_AUDIT_UTILS_H_
-#define _NFS_AUDIT_UTILS_H_
+#ifndef _UTILS_H_
+#define _UTILS_H_
 
-#include <bsm/audit.h>
 #include <poll.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <bsm/audit.h>
+
 #include <nfsc/libnfs.h>
 #include <nfsc/libnfs-raw.h>
 #include <nfsc/libnfs-raw-mount.h>
@@ -41,10 +43,6 @@ struct nfs_context {
 	int	mountport;
 };
 
-static struct pollfd fds[1];
-static char *SERVER = "127.1";
-static const char *auclass = "nfs";
-
 struct nfs_context *tc_body_init(int, struct au_rpc_data *);
 void nfs_res_close_cb(struct nfs_context *, int, void *, void *);
 int nfs_poll_fd(struct nfs_context *, struct au_rpc_data*);
@@ -77,4 +75,4 @@ void cleanup(void);
 #define AUE_NFS3RPC_PATHCONF	43285
 #define AUE_NFS3RPC_COMMIT	43286
 
-#endif
+#endif	/* _UTILS_H */

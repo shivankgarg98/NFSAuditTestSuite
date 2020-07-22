@@ -9,6 +9,8 @@ CFLAGS+=	-I${LOCALBASE}/include
 
 LDFLAGS+=	-lbsm -latf-c -lnfs
 
+WARNS?= 6
+
 LDADD+=	-L${LOCALBASE}/lib
 
 .include <bsd.test.mk>

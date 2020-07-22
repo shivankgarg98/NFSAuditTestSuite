@@ -1,5 +1,5 @@
 syntax(2)
 
-test_suite("nfs-audit Test Suite")
+test_suite("nfs-audit")
 
-atf_test_program{name="nfs-test1"} 
+atf_test_program{name="nfs-test1", timeout="30", required_user="root", is_exclusive="true", required_files="/etc/rc.d/auditd /etc/rc.d/nfsd /etc/rc.d/mountd"}

@@ -8,9 +8,11 @@
 
 #include "utils.h"
 
-static char *path = "fileforaudit";
-static char *successreg = "fileforaudit.*return,success";
-static char *failurereg = "fileforaudit.*return,failure";
+static struct pollfd fds[1];
+static const char *auclass = "nfs";
+static char path[] = "fileforaudit";
+static const char *successreg = "fileforaudit.*return,success";
+static const char *failurereg = "fileforaudit.*return,failure";
 
 ATF_TC_WITH_CLEANUP(nfs3_getattr_success);
 ATF_TC_HEAD(nfs3_getattr_success, tc)
@@ -445,7 +447,7 @@ ATF_TC_BODY(nfs3_write_success, tc)
 	struct nfs_fh3 *fh3;
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_WRITE, &au_test_data);
 	const char *regex = "nfsrvd_write.*return,success";
-	char *buf = "NFS AUDIT Test Write";
+	char buf[] = "NFS AUDIT Test Write";
 
 	ATF_REQUIRE(nfs_open(nfs, path, O_WRONLY, &nfsfh) == 0);
 	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
@@ -486,7 +488,7 @@ ATF_TC_BODY(nfs3_write_failure, tc)
 	struct nfs_fh3 *fh3;
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_WRITE, &au_test_data);
 	const char *regex = "nfsrvd_write.*return,failure";
-	char *buf = "NFS AUDIT Test Write";
+	char buf[] = "NFS AUDIT Test Write";
 
 	ATF_REQUIRE(nfs_open(nfs, path, O_WRONLY, &nfsfh) == 0);
 	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
@@ -654,6 +656,7 @@ ATF_TC_BODY(nfs3_symlink_success, tc)
 	struct au_rpc_data au_test_data;
 	FILE *pipefd;
 	SYMLINK3args args;
+	char buf[] = "symlink";
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_SYMLINK, &au_test_data);
 
 	pipefd = setup(fds, auclass);
@@ -662,7 +665,7 @@ ATF_TC_BODY(nfs3_symlink_success, tc)
 	args.where.name = path;
 	args.symlink.symlink_attributes.mode.set_it = 1;
 	args.symlink.symlink_attributes.mode.set_mode3_u.mode = S_IRUSR|S_IWUSR|S_IXUSR;
-	args.symlink.symlink_data = "symlink";
+	args.symlink.symlink_data = buf;
 	ATF_REQUIRE(rpc_nfs3_symlink_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
 	    &args, &au_test_data) == 0);
 	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
@@ -687,6 +690,7 @@ ATF_TC_BODY(nfs3_symlink_failure, tc)
 	struct au_rpc_data au_test_data;
 	FILE *pipefd;
 	SYMLINK3args args;
+	char buf[] = "symlink";
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_SYMLINK, &au_test_data);
 	
 	ATF_REQUIRE_EQ(0, symlink("symlink", path));
@@ -696,7 +700,7 @@ ATF_TC_BODY(nfs3_symlink_failure, tc)
 	args.where.name = path;
 	args.symlink.symlink_attributes.mode.set_it = 1;
 	args.symlink.symlink_attributes.mode.set_mode3_u.mode = S_IRUSR|S_IWUSR|S_IXUSR;
-	args.symlink.symlink_data = "symlink";
+	args.symlink.symlink_data = buf;
 	ATF_REQUIRE(rpc_nfs3_symlink_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
 	    &args, &au_test_data) == 0);
 	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
@@ -921,6 +925,7 @@ ATF_TC_BODY(nfs3_rename_success, tc)
 	struct au_rpc_data au_test_data;
 	FILE *pipefd;
 	RENAME3args args;
+	char buf[] = "newnameforfile";
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_RENAME, &au_test_data);
 
 	pipefd = setup(fds, auclass);
@@ -929,7 +934,7 @@ ATF_TC_BODY(nfs3_rename_success, tc)
 	args.from.name = path;
 	args.to.dir.data.data_len = nfs->rootfh.len;
 	args.to.dir.data.data_val = nfs->rootfh.val;
-	args.to.name = "newnameforfile";
+	args.to.name = buf;
 	ATF_REQUIRE(rpc_nfs3_rename_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
 	    &args, &au_test_data) == 0);
 	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
@@ -954,6 +959,7 @@ ATF_TC_BODY(nfs3_rename_failure, tc)
 	struct au_rpc_data au_test_data;
 	FILE *pipefd;
 	RENAME3args args;
+	char buf[] = "newnameforfile";
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_RENAME, &au_test_data);
 
 	pipefd = setup(fds, auclass);
@@ -962,7 +968,7 @@ ATF_TC_BODY(nfs3_rename_failure, tc)
 	args.from.name = path;
 	args.to.dir.data.data_len = nfs->rootfh.len;
 	args.to.dir.data.data_val = nfs->rootfh.val;
-	args.to.name = "newnameforfile";
+	args.to.name = buf;
 	ATF_REQUIRE(rpc_nfs3_rename_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
 	    &args, &au_test_data) == 0);
 	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
