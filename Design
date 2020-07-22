@@ -19,5 +19,3 @@ DONE -What and How should I export folder for NFS sharing? Currently, SERVER: 19
 DONE -How to exports the subdirectory in Kyua generated temp folder. Currently, I hardcode path values /etc/exports and same with ATF TEST CASE. Exporting the server directory through the ATF program will be more good.
 DONE -Reduce code duplicacy while writing test body. Looking for some way to do it. Currently I defiined a helper function which do the job pretty good.
 DONE -Problems with the design described in Point 4. I'm unable to find the failure cases with res != NFS3_OK. (like case of getattr) - SOLVED
-
-
