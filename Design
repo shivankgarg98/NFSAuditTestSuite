@@ -4,6 +4,8 @@ TEST CASES FOR NFS AUDIT
 XXX: SOME WEIRD PROBLEM/BUG WITH AUDIT LOG
 **** Ist record(after system rebooted) fail to appear in the audit trail. This lead to failure of first test case always(on first run after start) as it can't regex match in record string. ****
 
+XXX: while running the AuditTestSuite, nothing appears in `praudit /dev/auditpipe` but rpc logs appear while running NFSAuditTestSuite, and bugs issue due to this. Probably, some issue while setting up audit, Unable to debug as all conditions pass, and code exactly similar to AuditTestSuite.
+
 XXX: I was not able to supply a nfsfh to rpc_nfs3_readlink_async for symlink. So, I used high level api nfs_readlink to test the nfsrvd_readlink.
 
 XXX: vnode locking issues exists with NFS audit code. I checked it with libnfs/tests while auditd running. 
