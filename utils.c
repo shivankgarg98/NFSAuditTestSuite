@@ -270,7 +270,7 @@ struct nfs_context
 	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
 	url.server = SERVER;
 	url.path = cwd;
-	ATF_REQUIRE_MSG(nfs_mount(nfs, url.server, url.path) == 0,
+	ATF_REQUIRE_EQ_MSG(0, nfs_mount(nfs, url.server, url.path),
 	    "Failed to mount nfs share");
 
 	return nfs;
@@ -369,7 +369,7 @@ nfs_res_close_cb(__unused struct nfs_context *nfs, int status, void *data, void 
 		au_test_data->au_rpc_result = ((COMMIT3res *)data)->status;
 		break;
 	default:
-		ATF_REQUIRE_MSG(1 == 0, "unknown RPC event");
+		ATF_REQUIRE_EQ_MSG(0, 1, "unknown RPC event");
 	}
 	au_test_data->au_rpc_status = status;
 	au_test_data->is_finished = 1;

@@ -33,14 +33,14 @@ ATF_TC_BODY(nfs3_getattr_success, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_GETATTR, &au_test_data);
 	const char *regex = "nfsrvd_getattr.*return,success";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.object = *fh3;
-	ATF_REQUIRE(rpc_nfs3_getattr_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_getattr_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -68,15 +68,15 @@ ATF_TC_BODY(nfs3_getattr_failure, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_GETATTR, &au_test_data);
 	const char *regex = "nfsrvd_getattr.*return,failure";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	/* Remove the file. The resulting error is Stale NFS file handle. */
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.object = *fh3;
-	ATF_REQUIRE(rpc_nfs3_getattr_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_getattr_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -105,16 +105,16 @@ ATF_TC_BODY(nfs3_setattr_success, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_SETATTR, &au_test_data);
 	const char *regex = "nfsrvd_setattr.*return,success";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.object = *fh3;
 	args.new_attributes.mode.set_it = 1;
 	args.new_attributes.mode.set_mode3_u.mode = 0222;
-	ATF_REQUIRE(rpc_nfs3_setattr_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_setattr_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -141,17 +141,17 @@ ATF_TC_BODY(nfs3_setattr_failure, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_SETATTR, &au_test_data);
 	const char *regex = "nfsrvd_setattr.*return,failure";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	/* Remove the file. The resulting error is Stale NFS file handle. */
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.object = *fh3;
 	args.new_attributes.mode.set_it = 1;
 	args.new_attributes.mode.set_mode3_u.mode = 0222;
-	ATF_REQUIRE(rpc_nfs3_setattr_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_setattr_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -180,10 +180,10 @@ ATF_TC_BODY(nfs3_lookup_success, tc)
 	args.what.dir.data.data_len = nfs->rootfh.len;
 	args.what.dir.data.data_val = nfs->rootfh.val;
 	args.what.name = path;
-	ATF_REQUIRE(rpc_nfs3_lookup_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_lookup_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -210,9 +210,9 @@ ATF_TC_BODY(nfs3_lookup_failure, tc)
 	args.what.dir.data.data_len = nfs->rootfh.len;
 	args.what.dir.data.data_val = nfs->rootfh.val;
 	args.what.name = path;
-	ATF_REQUIRE(rpc_nfs3_lookup_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_lookup_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -241,15 +241,15 @@ ATF_TC_BODY(nfs3_access_success, tc)
 	ACCESS3args args;
 	const char *regex = "nfsrvd_access.*return,success";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.object  = *fh3;
 	args.access = ACCESS3_READ;
-	ATF_REQUIRE(rpc_nfs3_access_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_access_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -278,15 +278,15 @@ ATF_TC_BODY(nfs3_access_failure, tc)
 	const char *regex = "nfsrvd_access.*return,failure";
 
 	/* Remove the file. The resulting error is Stale NFS file handle. */
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.object  = *fh3;
 	args.access = ACCESS3_READ | ACCESS3_EXECUTE;
-	ATF_REQUIRE(rpc_nfs3_access_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_access_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -305,7 +305,7 @@ ATF_TC_HEAD(nfs3_readlink_success, tc)
 
 ATF_TC_BODY(nfs3_readlink_success, tc)
 {
-	ATF_REQUIRE(symlink(path, "symlink") == 0);
+	ATF_REQUIRE_EQ(0, symlink(path, "symlink"));
 
 	struct au_rpc_data au_test_data;
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_READLINK, &au_test_data);
@@ -315,7 +315,7 @@ ATF_TC_BODY(nfs3_readlink_success, tc)
 
 	nfs->version = NFS_V3;
 	pipefd = setup(fds, auclass);
-	ATF_REQUIRE(nfs_readlink(nfs, "symlink", buf, sizeof(buf)) == 0);
+	ATF_REQUIRE_EQ(0, nfs_readlink(nfs, "symlink", buf, sizeof(buf)));
 	ATF_REQUIRE_MATCH(buf, path);
 	check_audit(fds, regex, pipefd);
 }
@@ -373,16 +373,16 @@ ATF_TC_BODY(nfs3_read_success, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_READ, &au_test_data);
 	const char *regex = "nfsrvd_read.*return,success";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.file = *fh3;
 	args.offset = 0;
 	args.count = 1;
-	ATF_REQUIRE(rpc_nfs3_read_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_read_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -410,16 +410,16 @@ ATF_TC_BODY(nfs3_read_failure, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_READ, &au_test_data);
 	const char *regex = "nfsrvd_read.*return,failure";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.file = *fh3;
 	args.offset = 0;
 	args.count = 1;
-	ATF_REQUIRE(rpc_nfs3_read_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_read_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -449,8 +449,8 @@ ATF_TC_BODY(nfs3_write_success, tc)
 	const char *regex = "nfsrvd_write.*return,success";
 	char buf[] = "NFS AUDIT Test Write";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_WRONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_WRONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.file = *fh3;
 	args.offset = 0;
@@ -458,10 +458,10 @@ ATF_TC_BODY(nfs3_write_success, tc)
 	args.stable = FILE_SYNC;
 	args.data.data_len = strlen(buf);
 	args.data.data_val = buf;
-	ATF_REQUIRE(rpc_nfs3_write_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_write_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -490,9 +490,9 @@ ATF_TC_BODY(nfs3_write_failure, tc)
 	const char *regex = "nfsrvd_write.*return,failure";
 	char buf[] = "NFS AUDIT Test Write";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_WRONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_WRONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.file = *fh3;
 	args.offset = 0;
@@ -500,9 +500,9 @@ ATF_TC_BODY(nfs3_write_failure, tc)
 	args.stable = FILE_SYNC;
 	args.data.data_len = strlen(buf);
 	args.data.data_val = buf;
-	ATF_REQUIRE(rpc_nfs3_write_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_write_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -532,10 +532,10 @@ ATF_TC_BODY(nfs3_create_success, tc)
 	args.how.mode = GUARDED; /* Similiar to case if O_EXCL flag is provided with O_CREAT. */
 	args.how.createhow3_u.obj_attributes.mode.set_it = 1;
 	args.how.createhow3_u.obj_attributes.mode.set_mode3_u.mode = 0755;
-	ATF_REQUIRE(rpc_nfs3_create_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);	
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_create_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -567,9 +567,9 @@ ATF_TC_BODY(nfs3_create_failure, tc)
 	args.how.mode = GUARDED; /* Similiar to case if O_EXCL flag is provided with O_CREAT. */
 	args.how.createhow3_u.obj_attributes.mode.set_it = 1;
 	args.how.createhow3_u.obj_attributes.mode.set_mode3_u.mode = 0755;
-	ATF_REQUIRE(rpc_nfs3_create_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);	
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_create_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -598,10 +598,10 @@ ATF_TC_BODY(nfs3_mkdir_success, tc)
 	args.where.name = path;
 	args.attributes.mode.set_it = 1;
 	args.attributes.mode.set_mode3_u.mode = 0755;
-	ATF_REQUIRE(rpc_nfs3_mkdir_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_mkdir_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -632,9 +632,9 @@ ATF_TC_BODY(nfs3_mkdir_failure, tc)
 	args.where.name = path;
 	args.attributes.mode.set_it = 1;
 	args.attributes.mode.set_mode3_u.mode = 0755;
-	ATF_REQUIRE(rpc_nfs3_mkdir_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_mkdir_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -666,10 +666,10 @@ ATF_TC_BODY(nfs3_symlink_success, tc)
 	args.symlink.symlink_attributes.mode.set_it = 1;
 	args.symlink.symlink_attributes.mode.set_mode3_u.mode = S_IRUSR|S_IWUSR|S_IXUSR;
 	args.symlink.symlink_data = buf;
-	ATF_REQUIRE(rpc_nfs3_symlink_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_symlink_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -701,9 +701,9 @@ ATF_TC_BODY(nfs3_symlink_failure, tc)
 	args.symlink.symlink_attributes.mode.set_it = 1;
 	args.symlink.symlink_attributes.mode.set_mode3_u.mode = S_IRUSR|S_IWUSR|S_IXUSR;
 	args.symlink.symlink_data = buf;
-	ATF_REQUIRE(rpc_nfs3_symlink_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_symlink_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -737,10 +737,10 @@ ATF_TC_BODY(nfs3_mknod_success, tc)
 	args.what.mknoddata3_u.chr_device.dev_attributes.mode.set_mode3_u.mode = S_IRUSR|S_IWUSR|S_IXUSR;
 	args.what.mknoddata3_u.chr_device.spec.specdata1 = 1; /* Major Number */
 	args.what.mknoddata3_u.chr_device.spec.specdata2 = 1; /* Minor Number */
-	ATF_REQUIRE(rpc_nfs3_mknod_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_mknod_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -775,9 +775,9 @@ ATF_TC_BODY(nfs3_mknod_failure, tc)
 	args.what.mknoddata3_u.chr_device.dev_attributes.mode.set_mode3_u.mode = S_IRUSR|S_IWUSR|S_IXUSR;
 	args.what.mknoddata3_u.chr_device.spec.specdata1 = 1; /* Major Number */
 	args.what.mknoddata3_u.chr_device.spec.specdata2 = 1; /* Minor Number */
-	ATF_REQUIRE(rpc_nfs3_mknod_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_mknod_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -807,10 +807,10 @@ ATF_TC_BODY(nfs3_remove_success, tc)
 	args.object.dir.data.data_len = nfs->rootfh.len;
 	args.object.dir.data.data_val = nfs->rootfh.val;
 	args.object.name = path;
-	ATF_REQUIRE(rpc_nfs3_remove_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_remove_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -837,9 +837,9 @@ ATF_TC_BODY(nfs3_remove_failure, tc)
 	args.object.dir.data.data_len = nfs->rootfh.len;
 	args.object.dir.data.data_val = nfs->rootfh.val;
 	args.object.name = path;
-	ATF_REQUIRE(rpc_nfs3_remove_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_remove_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -869,10 +869,10 @@ ATF_TC_BODY(nfs3_rmdir_success, tc)
 	args.object.dir.data.data_len = nfs->rootfh.len;
 	args.object.dir.data.data_val = nfs->rootfh.val;
 	args.object.name = path;
-	ATF_REQUIRE(rpc_nfs3_rmdir_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_rmdir_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -899,9 +899,9 @@ ATF_TC_BODY(nfs3_rmdir_failure, tc)
 	args.object.dir.data.data_len = nfs->rootfh.len;
 	args.object.dir.data.data_val = nfs->rootfh.val;
 	args.object.name = path;
-	ATF_REQUIRE(rpc_nfs3_rmdir_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_rmdir_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -935,10 +935,10 @@ ATF_TC_BODY(nfs3_rename_success, tc)
 	args.to.dir.data.data_len = nfs->rootfh.len;
 	args.to.dir.data.data_val = nfs->rootfh.val;
 	args.to.name = buf;
-	ATF_REQUIRE(rpc_nfs3_rename_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_rename_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -969,9 +969,9 @@ ATF_TC_BODY(nfs3_rename_failure, tc)
 	args.to.dir.data.data_len = nfs->rootfh.len;
 	args.to.dir.data.data_val = nfs->rootfh.val;
 	args.to.name = buf;
-	ATF_REQUIRE(rpc_nfs3_rename_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_rename_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -999,17 +999,17 @@ ATF_TC_BODY(nfs3_link_success, tc)
 	LINK3args args;
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_LINK, &au_test_data);
 	
-	ATF_REQUIRE(nfs_open(nfs, "ATestFile", O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, "ATestFile", O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.file = *fh3;
 	args.link.dir.data.data_len = nfs->rootfh.len;
 	args.link.dir.data.data_val = nfs->rootfh.val;
 	args.link.name = path;
-	ATF_REQUIRE(rpc_nfs3_link_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_link_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, successreg, pipefd);
 }
 
@@ -1036,8 +1036,8 @@ ATF_TC_BODY(nfs3_link_failure, tc)
 	LINK3args args;
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_LINK, &au_test_data);
 	
-	ATF_REQUIRE(nfs_open(nfs, "ATestFile", O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, "ATestFile", O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	/* Create a file with same name so that link throws an error. */
 	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
 	pipefd = setup(fds, auclass);
@@ -1045,9 +1045,9 @@ ATF_TC_BODY(nfs3_link_failure, tc)
 	args.link.dir.data.data_len = nfs->rootfh.len;
 	args.link.dir.data.data_val = nfs->rootfh.val;
 	args.link.name = path;
-	ATF_REQUIRE(rpc_nfs3_link_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_link_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, failurereg, pipefd);
 }
@@ -1079,10 +1079,10 @@ ATF_TC_BODY(nfs3_readdir_success, tc)
 	args.cookie = 0;
 	memset(&args.cookieverf, 0, sizeof(cookieverf3));
 	args.count = 8192;
-	ATF_REQUIRE(rpc_nfs3_readdir_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_readdir_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -1113,9 +1113,9 @@ ATF_TC_BODY(nfs3_readdir_failure, tc)
 	args.cookie = -1; /* Bad cookie value throws an error. */
 	memset(&args.cookieverf, 0, sizeof(cookieverf3));
 	args.count = 8192;
-	ATF_REQUIRE(rpc_nfs3_readdir_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_readdir_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -1148,10 +1148,10 @@ ATF_TC_BODY(nfs3_readdirplus_success, tc)
 	memset(&args.cookieverf, 0, sizeof(cookieverf3));
 	args.dircount = 8192;
 	args.maxcount = 8192;
-	ATF_REQUIRE(rpc_nfs3_readdirplus_async(nfs->rpc,
-	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_readdirplus_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -1183,9 +1183,9 @@ ATF_TC_BODY(nfs3_readdirplus_failure, tc)
 	memset(&args.cookieverf, 0, sizeof(cookieverf3));
 	args.dircount = 8192;
 	args.maxcount = 8192;
-	ATF_REQUIRE(rpc_nfs3_readdirplus_async(nfs->rpc,
-	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_readdirplus_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -1214,14 +1214,14 @@ ATF_TC_BODY(nfs3_fsstat_success, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_FSSTAT, &au_test_data);
 	const char *regex = "nfsrvd_statfs.*return,success";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.fsroot = *fh3;
-	ATF_REQUIRE(rpc_nfs3_fsstat_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_fsstat_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -1250,14 +1250,14 @@ ATF_TC_BODY(nfs3_fsstat_failure, tc)
 	const char *regex = "nfsrvd_statfs.*return,failure";
 
 	/* Remove the directory to get a stale file handle error. */
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.fsroot = *fh3;
-	ATF_REQUIRE(rpc_nfs3_fsstat_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_fsstat_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -1286,14 +1286,14 @@ ATF_TC_BODY(nfs3_fsinfo_success, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_FSINFO, &au_test_data);
 	const char *regex = "nfsrvd_fsinfo.*return,success";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.fsroot = *fh3;
-	ATF_REQUIRE(rpc_nfs3_fsinfo_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_fsinfo_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -1322,14 +1322,14 @@ ATF_TC_BODY(nfs3_fsinfo_failure, tc)
 	const char *regex = "nfsrvd_fsinfo.*return,failure";
 
 	/* Remove the directory to get a stale file handle error. */
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.fsroot = *fh3;
-	ATF_REQUIRE(rpc_nfs3_fsinfo_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_fsinfo_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -1358,14 +1358,14 @@ ATF_TC_BODY(nfs3_pathconf_success, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_PATHCONF, &au_test_data);
 	const char *regex = "nfsrvd_pathconf.*return,success";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.object = *fh3;
-	ATF_REQUIRE(rpc_nfs3_pathconf_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_pathconf_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -1393,15 +1393,15 @@ ATF_TC_BODY(nfs3_pathconf_failure, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_PATHCONF, &au_test_data);
 	const char *regex = "nfsrvd_pathconf.*return,failure";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	/* Remove the file. The resulting error is Stale NFS file handle. */
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.object = *fh3;
-	ATF_REQUIRE(rpc_nfs3_pathconf_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_pathconf_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -1430,16 +1430,16 @@ ATF_TC_BODY(nfs3_commit_success, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_COMMIT, &au_test_data);
 	const char *regex = "nfsrvd_commit.*return,success";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
 	pipefd = setup(fds, auclass);
 	args.file = *fh3;
 	args.offset = 0;
 	args.count = 0;
-	ATF_REQUIRE(rpc_nfs3_commit_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
-	ATF_REQUIRE(NFS3_OK == au_test_data.au_rpc_result);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_commit_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE_EQ(NFS3_OK, au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -1467,16 +1467,16 @@ ATF_TC_BODY(nfs3_commit_failure, tc)
 	struct nfs_context *nfs = tc_body_init(AUE_NFS3RPC_COMMIT, &au_test_data);
 	const char *regex = "nfsrvd_commit.*return,failure";
 
-	ATF_REQUIRE(nfs_open(nfs, path, O_RDONLY, &nfsfh) == 0);
-	fh3  = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
-	ATF_REQUIRE(remove(path) == 0);
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	fh3 = (struct nfs_fh3 *)nfs_get_fh(nfsfh);
+	ATF_REQUIRE_EQ(0, remove(path));
 	pipefd = setup(fds, auclass);
 	args.file = *fh3;
 	args.offset = 0;
 	args.count = 0;
-	ATF_REQUIRE(rpc_nfs3_commit_async(nfs->rpc, (rpc_cb)nfs_res_close_cb,
-	    &args, &au_test_data) == 0);
-	ATF_REQUIRE(nfs_poll_fd(nfs, &au_test_data) == RPC_STATUS_SUCCESS);
+	ATF_REQUIRE_EQ(0, rpc_nfs3_commit_async(nfs->rpc,
+	    (rpc_cb)nfs_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
 	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
 	check_audit(fds, regex, pipefd);
 }
@@ -1488,48 +1488,48 @@ ATF_TC_CLEANUP(nfs3_commit_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
-	ATF_TP_ADD_TC(tp, nfs3_getattr_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_getattr_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_setattr_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_setattr_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_lookup_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_lookup_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_access_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_access_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_readlink_success);//problem
-	ATF_TP_ADD_TC(tp, nfs3_readlink_failure);//problem
-	ATF_TP_ADD_TC(tp, nfs3_read_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_read_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_write_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_write_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_create_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_create_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_mkdir_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_mkdir_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_symlink_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_symlink_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_mknod_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_mknod_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_remove_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_remove_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_rmdir_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_rmdir_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_rename_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_rename_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_link_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_link_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_readdir_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_readdir_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_readdirplus_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_readdirplus_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_fsstat_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_fsstat_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_fsinfo_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_fsinfo_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_pathconf_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_pathconf_failure);//done
-	ATF_TP_ADD_TC(tp, nfs3_commit_success);//done
-	ATF_TP_ADD_TC(tp, nfs3_commit_failure);//done
+	ATF_TP_ADD_TC(tp, nfs3_getattr_success);
+	ATF_TP_ADD_TC(tp, nfs3_getattr_failure);
+	ATF_TP_ADD_TC(tp, nfs3_setattr_success);
+	ATF_TP_ADD_TC(tp, nfs3_setattr_failure);
+	ATF_TP_ADD_TC(tp, nfs3_lookup_success);
+	ATF_TP_ADD_TC(tp, nfs3_lookup_failure);
+	ATF_TP_ADD_TC(tp, nfs3_access_success);
+	ATF_TP_ADD_TC(tp, nfs3_access_failure);
+	ATF_TP_ADD_TC(tp, nfs3_readlink_success);
+	ATF_TP_ADD_TC(tp, nfs3_readlink_failure);
+	ATF_TP_ADD_TC(tp, nfs3_read_success);
+	ATF_TP_ADD_TC(tp, nfs3_read_failure);
+	ATF_TP_ADD_TC(tp, nfs3_write_success);
+	ATF_TP_ADD_TC(tp, nfs3_write_failure);
+	ATF_TP_ADD_TC(tp, nfs3_create_success);
+	ATF_TP_ADD_TC(tp, nfs3_create_failure);
+	ATF_TP_ADD_TC(tp, nfs3_mkdir_success);
+	ATF_TP_ADD_TC(tp, nfs3_mkdir_failure);
+	ATF_TP_ADD_TC(tp, nfs3_symlink_success);
+	ATF_TP_ADD_TC(tp, nfs3_symlink_failure);
+	ATF_TP_ADD_TC(tp, nfs3_mknod_success);
+	ATF_TP_ADD_TC(tp, nfs3_mknod_failure);
+	ATF_TP_ADD_TC(tp, nfs3_remove_success);
+	ATF_TP_ADD_TC(tp, nfs3_remove_failure);
+	ATF_TP_ADD_TC(tp, nfs3_rmdir_success);
+	ATF_TP_ADD_TC(tp, nfs3_rmdir_failure);
+	ATF_TP_ADD_TC(tp, nfs3_rename_success);
+	ATF_TP_ADD_TC(tp, nfs3_rename_failure);
+	ATF_TP_ADD_TC(tp, nfs3_link_success);
+	ATF_TP_ADD_TC(tp, nfs3_link_failure);
+	ATF_TP_ADD_TC(tp, nfs3_readdir_success);
+	ATF_TP_ADD_TC(tp, nfs3_readdir_failure);
+	ATF_TP_ADD_TC(tp, nfs3_readdirplus_success);
+	ATF_TP_ADD_TC(tp, nfs3_readdirplus_failure);
+	ATF_TP_ADD_TC(tp, nfs3_fsstat_success);
+	ATF_TP_ADD_TC(tp, nfs3_fsstat_failure);
+	ATF_TP_ADD_TC(tp, nfs3_fsinfo_success);
+	ATF_TP_ADD_TC(tp, nfs3_fsinfo_failure);
+	ATF_TP_ADD_TC(tp, nfs3_pathconf_success);
+	ATF_TP_ADD_TC(tp, nfs3_pathconf_failure);
+	ATF_TP_ADD_TC(tp, nfs3_commit_success);
+	ATF_TP_ADD_TC(tp, nfs3_commit_failure);
 
 	return (atf_no_error());
 }
