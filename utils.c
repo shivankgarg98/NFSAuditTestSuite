@@ -238,14 +238,14 @@ FILE
 void
 cleanup(void)
 {
+	if (atf_utils_file_exists("started_auditd"))
+		system("service auditd onestop > /dev/null 2>&1");
 	if (atf_utils_file_exists("mountd_running"))
 		system("service mountd restart > /dev/null 2>&1");
 	else
 		system("service mountd onestop > /dev/null 2>&1");
 	if (atf_utils_file_exists("started_nfsd"))
 		system("service nfsd onestop > /dev/null 2>&1");
-	if (atf_utils_file_exists("started_auditd"))
-		system("service auditd onestop > /dev/null 2>&1");
 }
 
 struct nfs_context
@@ -270,6 +270,13 @@ struct nfs_context
 	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
 	url.server = SERVER;
 	url.path = cwd;
+	/*
+	 * XXX: If nfsd isn't already running, some tests maybe/are failing
+	 * becuse of error at nfs_mount. Adding a delay after nfsd is
+	 * started solves the problem.
+	 * Is there some better solution?
+	 */
+	system("sleep 0.5");
 	ATF_REQUIRE_EQ_MSG(0, nfs_mount(nfs, url.server, url.path),
 	    "Failed to mount nfs share");
 
