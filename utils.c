@@ -272,11 +272,13 @@ struct nfs_context
 	url.path = cwd;
 	/*
 	 * XXX: If nfsd isn't already running, some tests maybe/are failing
-	 * becuse of error at nfs_mount. Adding a delay after nfsd is
-	 * started solves the problem.
+	 * becuse of error at nfs_mount. Adding a delay, after nfsd is being
+	 * started here, solve the problem.
 	 * Is there some better solution?
 	 */
-	system("sleep 0.5");
+	if (atf_utils_file_exists("started_nfsd"))
+		ATF_REQUIRE_EQ(0, system("service nfsd onestatus && \
+		sleep 0.5"));
 	ATF_REQUIRE_EQ_MSG(0, nfs_mount(nfs, url.server, url.path),
 	    "Failed to mount nfs share");
 
