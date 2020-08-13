@@ -261,12 +261,22 @@ struct nfs_context
 	au_test_data->au_rpc_status = -1;
 	au_test_data->au_rpc_result = -1;
 	au_test_data->is_finished = 0;
+
+	/* XXX TODO: Make the nfsv4_server_enable change temporary. */
+	if (au_rpc_event >= AUE_NFSV4RPC_COMPOUND)
+		system("sysrc nfsv4_server_enable=YES");
+
 	ATF_REQUIRE_EQ(0, system(" ! { service mountd onestatus ; } || \
 	    { service mountd onestop && touch mountd_running ; }"));
-	ATF_REQUIRE_EQ(0, system("echo $PWD -mapall=root 127.1 > \
+
+	if (au_rpc_event >= AUE_NFSV4RPC_COMPOUND)
+		ATF_REQUIRE_EQ(0, system("echo V4: / 127.1 > NFSAuditExports"));
+	ATF_REQUIRE_EQ(0, system("echo $PWD -mapall=root 127.1 >> \
 	    NFSAuditExports && mountd NFSAuditExports"));
+
 	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
 	    { service nfsd onestart && touch started_nfsd ; }"));
+
 	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
 	url.server = SERVER;
 	url.path = cwd;
@@ -279,6 +289,7 @@ struct nfs_context
 	if (atf_utils_file_exists("started_nfsd"))
 		ATF_REQUIRE_EQ(0, system("service nfsd onestatus && \
 		sleep 0.5"));
+
 	ATF_REQUIRE_EQ_MSG(0, nfs_mount(nfs, url.server, url.path),
 	    "Failed to mount nfs share");
 
@@ -302,8 +313,11 @@ nfs_poll_fd(struct nfs_context *nfs, struct au_rpc_data *au_test_data)
 		if (au_test_data->is_finished)
 			break;
 	}
+
 	nfs_umount(nfs);
-	nfs_destroy_context(nfs);
+	rpc_destroy_context(nfs->rpc);
+	nfs->rpc = NULL;
+	free(nfs);
 
 	return au_test_data->au_rpc_status;
 }
@@ -380,6 +394,17 @@ nfs_res_close_cb(__unused struct nfs_context *nfs, int status, void *data, void 
 	default:
 		ATF_REQUIRE_EQ_MSG(0, 1, "unknown RPC event");
 	}
+	au_test_data->au_rpc_status = status;
+	au_test_data->is_finished = 1;
+}
+
+void
+nfsv4_res_close_cb(__unused struct nfs_context *nfs, int status, void *data, void *private_data)
+{
+	struct au_rpc_data* au_test_data = (struct au_rpc_data *)private_data;
+	COMPOUND4res *res = data;
+
+	au_test_data->au_rpc_result = res->status;
 	au_test_data->au_rpc_status = status;
 	au_test_data->is_finished = 1;
 }
