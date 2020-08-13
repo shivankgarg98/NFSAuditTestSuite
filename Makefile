@@ -15,6 +15,8 @@ LDFLAGS+=	-lbsm -latf-c -lnfs
 
 WARNS?=	6
 
+KYUAFILE=	yes
+
 LDADD+=	-L${LOCALBASE}/lib
 
 .include <bsd.test.mk>

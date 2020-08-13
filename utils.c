@@ -254,7 +254,8 @@ struct nfs_context
 {
 	struct nfs_context *nfs;
 	struct nfs_url url;
-	char cwd[PATH_MAX];
+	char cwd[PATH_MAX + 1];
+	FILE *exportsfile;
 	int error;
 
 	nfs = nfs_init_context();
@@ -265,21 +266,26 @@ struct nfs_context
 	au_test_data->is_finished = 0;
 
 	/* XXX TODO: Make the nfsv4_server_enable change temporary. */
-	if (au_rpc_event >= AUE_NFSV4RPC_COMPOUND)
+	if (au_rpc_event >= AUE_NFSV4RPC_COMPOUND) {
+		nfs->version = NFS_V4;
 		system("sysrc nfsv4_server_enable=YES");
+	}
 
 	ATF_REQUIRE_EQ(0, system(" ! { service mountd onestatus ; } || \
 	    { service mountd onestop && touch mountd_running ; }"));
 
+	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
+	ATF_REQUIRE((exportsfile = fopen("NFSAuditExports", "w")) != NULL);
+
 	if (au_rpc_event >= AUE_NFSV4RPC_COMPOUND)
-		ATF_REQUIRE_EQ(0, system("echo V4: / 127.1 > NFSAuditExports"));
-	ATF_REQUIRE_EQ(0, system("echo $PWD -mapall=root 127.1 >> \
-	    NFSAuditExports && mountd NFSAuditExports"));
+		fprintf(exportsfile, "V4: / 127.1\n");
+	fprintf(exportsfile, "%s -mapall=root 127.1\n", cwd);
+	fclose(exportsfile);
+	ATF_REQUIRE_EQ(0, system("mountd NFSAuditExports"));
 
 	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
 	    { service nfsd onestart && touch started_nfsd ; }"));
 
-	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
 	url.server = SERVER;
 	url.path = cwd;
 	/* loop waiting for nfsd to be ready to accept connections */

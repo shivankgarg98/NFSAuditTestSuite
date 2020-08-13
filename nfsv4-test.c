@@ -74,7 +74,7 @@ ATF_TC_BODY(nfs4_getattr_success, tc)
 	COMPOUND4args args;
 	nfs_argop4 op[2];
 	struct nfsfh *nfsfh = NULL;
-	struct nfs_context *nfs = tc_v4_body_init(AUE_NFSV4OP_GETATTR, &au_test_data);
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_GETATTR, &au_test_data);
 	const char *regex = "nfsrvd_getattr.*return,success";
 
 	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
