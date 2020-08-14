@@ -131,7 +131,8 @@ get_audit_mask(const char *name)
 	au_mask_t fmask;
 	au_class_ent_t *class;
 
-	ATF_REQUIRE((class = getauclassnam(name)) != NULL);
+	ATF_REQUIRE_MSG((class = getauclassnam(name)) != NULL,
+	    "No audit class %s found", name);
 	fmask.am_success = class->ac_class;
 	fmask.am_failure = class->ac_class;
 	return (fmask);
@@ -254,6 +255,7 @@ struct nfs_context
 	struct nfs_context *nfs;
 	struct nfs_url url;
 	char cwd[PATH_MAX];
+	int error;
 
 	nfs = nfs_init_context();
 	ATF_REQUIRE(nfs != NULL);
@@ -270,15 +272,18 @@ struct nfs_context
 	ATF_REQUIRE(getcwd(cwd, PATH_MAX) != NULL);
 	url.server = SERVER;
 	url.path = cwd;
-	/*
-	 * XXX: If nfsd isn't already running, some tests maybe/are failing
-	 * becuse of error at nfs_mount. Adding a delay after nfsd is
-	 * started solves the problem.
-	 * Is there some better solution?
-	 */
-	system("sleep 0.5");
-	ATF_REQUIRE_EQ_MSG(0, nfs_mount(nfs, url.server, url.path),
-	    "Failed to mount nfs share");
+	/* loop waiting for nfsd to be ready to accept connections */
+	for(;;) {
+		error = nfs_mount(nfs, url.server, url.path);
+		/*
+		 * for reasons of its own, libnfs returns EFAULT if the mount
+		 * fails.
+		 */
+		if (error != -EFAULT)
+			break;
+		usleep(10000);
+	}
+	ATF_REQUIRE_EQ_MSG(error, 0, "nfs_mount: %s", strerror(-error));
 
 	return nfs;
 }
