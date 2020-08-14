@@ -31,14 +31,14 @@ static char path[] = "fileforaudit";
 static int
 nfs4_op_access(__unused struct nfs_context *nfs, nfs_argop4 *op, uint32_t access_mask)
 {
-        ACCESS4args *aargs;
+	ACCESS4args *aargs;
 
-        op[0].argop = OP_ACCESS;
-        aargs = &op[0].nfs_argop4_u.opaccess;
-        memset(aargs, 0, sizeof(*aargs));
-        aargs->access = access_mask;
+	op[0].argop = OP_ACCESS;
+	aargs = &op[0].nfs_argop4_u.opaccess;
+	memset(aargs, 0, sizeof(*aargs));
+	aargs->access = access_mask;
 
-        return 1;
+	return 1;
 }
 
 static int
@@ -85,18 +85,18 @@ ATF_TC_BODY(nfs4_access_success, tc)
 	FILE *pipefd;
 	int i;
 	COMPOUND4args args;
-	nfs_argop4 op[1];
+	nfs_argop4 op[2];
 	struct nfsfh *nfsfh = NULL;
 	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_ACCESS, &au_test_data);
 	const char *regex = "nfsrvd_access.*return,success";
 
 	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
 	pipefd = setup(fds, auclass);
-	i = nfs4_op_access(nfs, &op[0], ACCESS4_READ);
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	i += nfs4_op_access(nfs, &op[i], ACCESS4_READ);
 	memset(&args, 0, sizeof(args));
 	args.argarray.argarray_len = i;
 	args.argarray.argarray_val = op;
-	printf("%ld\n",nfs->clientid);
 	ATF_REQUIRE_EQ(0, rpc_nfs4_compound_async(nfs->rpc,
 	    (rpc_cb)nfsv4_res_close_cb, &args, &au_test_data));
 	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
@@ -105,6 +105,45 @@ ATF_TC_BODY(nfs4_access_success, tc)
 }
 
 ATF_TC_CLEANUP(nfs4_access_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_access_failure);
+ATF_TC_HEAD(nfs4_access_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 Access RPC");
+}
+
+ATF_TC_BODY(nfs4_access_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	FILE *pipefd;
+	int i;
+	COMPOUND4args args;
+	nfs_argop4 op[1];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_ACCESS, &au_test_data);
+	const char *regex = "nfsrvd_access.*return,failure";
+
+	/* NFSv4 ACCESS sub-operation will fail due to invalid use. (no PUTFH subop) */
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	pipefd = setup(fds, auclass);
+	i = nfs4_op_access(nfs, &op[0], ACCESS4_DELETE);
+	memset(&args, 0, sizeof(args));
+	args.argarray.argarray_len = i;
+	args.argarray.argarray_val = op;
+	ATF_REQUIRE_EQ(0, rpc_nfs4_compound_async(nfs->rpc,
+	    (rpc_cb)nfsv4_res_close_cb, &args, &au_test_data));
+	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS, nfs_poll_fd(nfs, &au_test_data));
+	ATF_REQUIRE(NFS3_OK != au_test_data.au_rpc_result);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs4_access_failure, tc)
 {
 	cleanup();
 }
@@ -170,7 +209,7 @@ ATF_TC_BODY(nfs4_getattr_failure, tc)
 
 	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
 	pipefd = setup(fds, auclass);
-	/* GETATTR sub-operations will fail due to invalid getattr args. (no PUTFH) */
+	/* NFSv4 GETATTR sub-operation will fail due to invalid use. (no PUTFH subop) */
 	i = nfs4_op_getattr(nfs, &op[0], standard_attributes, 2);
 	memset(&args, 0, sizeof(args));
 	args.argarray.argarray_len = i;
@@ -189,9 +228,10 @@ ATF_TC_CLEANUP(nfs4_getattr_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, nfs4_access_success);
+	ATF_TP_ADD_TC(tp, nfs4_access_failure);
 	ATF_TP_ADD_TC(tp, nfs4_getattr_success);
 	ATF_TP_ADD_TC(tp, nfs4_getattr_failure);
-	ATF_TP_ADD_TC(tp, nfs4_access_success);
 
 	return (atf_no_error());
 }
