@@ -267,10 +267,9 @@ struct nfs_context
 
 	/* XXX TODO: Make the nfsv4_server_enable change temporary. */
 	if (au_rpc_event >= AUE_NFSV4RPC_COMPOUND) {
-		nfs->version = NFS_V4;
+		ATF_REQUIRE_EQ(0, nfs_set_version(nfs, NFS_V4));
 		system("sysrc nfsv4_server_enable=YES");
 	}
-
 	ATF_REQUIRE_EQ(0, system(" ! { service mountd onestatus ; } || \
 	    { service mountd onestop && touch mountd_running ; }"));
 

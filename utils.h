@@ -30,22 +30,47 @@ struct nfs_fh {
 };
 
 struct stateid {
-        uint32_t seqid;
-        char other[12];
+	uint32_t seqid;
+	char other[12];
+};
+
+/*
+ * These are unused in NFSAuditTestSuite. But defined to prevent any mismatch
+ * in values if any field is directly accessed. (For instance, Directly
+ * accessing fields like client_id, version etc. field in struct nfs_context
+ * were showing incorrect values, as it should have been if printed from libnfs.
+ */
+struct nfsdir;
+struct nested_mounts;
+struct nfs_readahead {
+	uint64_t	fh_offset;
+	uint32_t	cur_ra;
+};
+struct nfs_pagecache_entry {
+	char	buf[NFS_BLKSIZE];
+	uint64_t	offset;
+	time_t	ts;
+};
+struct nfs_pagecache {
+	struct	nfs_pagecache_entry *entries;
+	uint32_t	num_entries;
+	time_t	ttl;
 };
 
 struct nfsfh {
-        struct nfs_fh fh;
-        int is_sync;
-        int is_append;
-        int is_dirty;
-        uint64_t offset;
+	struct nfs_fh fh;
+	int is_sync;
+	int is_append;
+	int is_dirty;
+	uint64_t offset;
+	struct nfs_readahead	ra;
+	struct nfs_pagecache	pagecache;
 
-        /* NFSv4 */
-        struct stateid stateid;
-        /* locking */
-        uint32_t lock_seqid;
-        struct stateid lock_stateid;
+	/* NFSv4 */
+	struct stateid stateid;
+	/* locking */
+	uint32_t lock_seqid;
+	struct stateid lock_stateid;
 };
 
 struct nfs_context {
@@ -55,12 +80,26 @@ struct nfs_context {
 	struct nfs_fh	rootfh;
 	uint64_t	readmax;
 	uint64_t	writemax;
-	uint16_t	mask;
-	char*	cwd;
+	char	*cwd;
+	int	dircache_enabled;
 	int	auto_reconnect;
+	struct nfsdir	*dircache;
+	uint16_t	mask;
+
+	int	auto_traverse_mounts;
+	struct nested_mounts	*nested_mounts;
+
 	int	version;
 	int	nfsport;
 	int	mountport;
+
+	/* NFSv4 specific fields */
+	verifier4	verifier;
+	char	*client_name;
+	uint64_t	clientid;
+	verifier4	setclientid_confirm;
+	uint32_t	seqid;
+	int	has_lock_owner;
 };
 
 struct nfs_context *tc_body_init(int, struct au_rpc_data *);
