@@ -287,6 +287,13 @@ struct nfs_context
 
 	url.server = SERVER;
 	url.path = cwd;
+
+	/*
+	 * XXX: NFSv4 nfs_mount is not working properly if nfsd isn't already
+	 * running.
+	 */
+	if (au_rpc_event >= AUE_NFSV4RPC_COMPOUND)
+		usleep(200000);
 	/* loop waiting for nfsd to be ready to accept connections */
 	for(;;) {
 		error = nfs_mount(nfs, url.server, url.path);
@@ -298,7 +305,7 @@ struct nfs_context
 			break;
 		usleep(10000);
 	}
-	ATF_REQUIRE_EQ_MSG(error, 0, "nfs_mount: %s", strerror(-error));
+	ATF_REQUIRE_EQ_MSG(error, 0, "nfs_mount: %d, %s",-error, strerror(-error));
 
 	return nfs;
 }
