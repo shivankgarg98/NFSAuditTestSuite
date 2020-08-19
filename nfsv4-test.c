@@ -40,9 +40,9 @@ do {									\
 	ATF_REQUIRE_EQ(RPC_STATUS_SUCCESS,				\
 	    nfs_poll_fd((nfs), &(au_test_data)));			\
 	if (IsSuccess)							\
-		ATF_REQUIRE_EQ(NFS3_OK, (au_test_data).au_rpc_result);	\
+		ATF_REQUIRE_EQ(NFS4_OK, (au_test_data).au_rpc_result);	\
 	else								\
-		ATF_REQUIRE(NFS3_OK != (au_test_data).au_rpc_result);	\
+		ATF_REQUIRE(NFS4_OK != (au_test_data).au_rpc_result);	\
 	check_audit(fds, (regex), pipefd);				\
 } while (0)
 
@@ -254,7 +254,7 @@ nfs4_op_lockt(struct nfs_context *nfs, nfs_argop4 *op, __unused struct nfsfh *fh
 	return 1;
 }
 
-__unused static int
+static int
 nfs4_op_locku(__unused struct nfs_context *nfs, nfs_argop4 *op, struct nfsfh *fh,
               nfs_lock_type4 locktype, uint64_t offset, length4 length)
 {
@@ -302,7 +302,6 @@ nfs4_op_nverify_chmod(__unused struct nfs_context *nfs,
 	verifyargs->obj_attributes.attrmask.bitmap4_val = mask;
 	verifyargs->obj_attributes.attr_vals.attrlist4_len = 4;
 	verifyargs->obj_attributes.attr_vals.attrlist4_val = nvbuf;
-
 
 	return 1;
 }
@@ -978,26 +977,17 @@ ATF_TC_BODY(nfs4_locku_success, tc)
 	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
 
 	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
 	struct nfsfh *nfsfh = NULL;
 	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_LOCKU, &au_test_data);
 	const char *regex = "nfsrvd_locku.*return,success";
 
-	/*
-	 * For some unknown reason, nfsv4-raw-api sub-op locku fails.
-	 * Hence, Used high-level API.
-	 */
 	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
-/**/	ATF_REQUIRE_EQ(0, nfs_lockf(nfs, nfsfh, NFS4_F_LOCK, 1));
-/**/	FILE *pipefd = setup(fds, auclass);
-/**/	ATF_REQUIRE_EQ(0, nfs_lockf(nfs, nfsfh, NFS4_F_ULOCK, 1));
-/*	int i;
-	nfs_argop4 op[4];
+	ATF_REQUIRE_EQ(0, nfs_lockf(nfs, nfsfh, NFS4_F_LOCK, 1));
 	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
-	i += nfs4_op_lock(nfs, &op[i], nfsfh, OP_LOCK, READW_LT, 0, 0, 1);
-	i += nfs4_op_putfh(nfs, &op[i], nfsfh);
 	i += nfs4_op_locku(nfs, &op[i], nfsfh, READW_LT, 0, 1);
 	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
-*//**/	check_audit(fds, (regex), pipefd);	
 }
 
 ATF_TC_CLEANUP(nfs4_locku_success, tc)
@@ -1017,17 +1007,16 @@ ATF_TC_BODY(nfs4_locku_failure, tc)
 	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
 
 	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
 	struct nfsfh *nfsfh = NULL;
 	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_LOCKU, &au_test_data);
 	const char *regex = "nfsrvd_locku.*return,failure";
 
-	/* Area not locked, resulting in unsuccessful locku operation. */
 	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
-	/*ATF_REQUIRE_EQ(0, nfs_lockf(nfs, nfsfh, NFS4_F_LOCK, 1));*/
-	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE(nfs_lockf(nfs, nfsfh, NFS4_F_ULOCK, 1) != 0);
-
-	check_audit(fds, regex, pipefd);
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	i += nfs4_op_locku(nfs, &op[i], nfsfh, READW_LT, 0, 1);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
 }
 
 ATF_TC_CLEANUP(nfs4_locku_failure, tc)
@@ -1292,6 +1281,7 @@ ATF_TC_CLEANUP(nfs4_openattr_failure, tc)
 	cleanup();
 }
 
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, nfs4_access_success);
@@ -1316,8 +1306,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, nfs4_lock_failure);
 	ATF_TP_ADD_TC(tp, nfs4_lockt_success);
 	ATF_TP_ADD_TC(tp, nfs4_lockt_failure);
-	ATF_TP_ADD_TC(tp, nfs4_locku_success); /* Used high-level nfs4 api. */
-	ATF_TP_ADD_TC(tp, nfs4_locku_failure); /* Used high-level nfs4 api. */
+	ATF_TP_ADD_TC(tp, nfs4_locku_success);
+	ATF_TP_ADD_TC(tp, nfs4_locku_failure);
 	ATF_TP_ADD_TC(tp, nfs4_lookup_success);
 	ATF_TP_ADD_TC(tp, nfs4_lookup_failure);
 	ATF_TP_ADD_TC(tp, nfs4_lookupp_success); /* TODO: read comment in tc_body */
