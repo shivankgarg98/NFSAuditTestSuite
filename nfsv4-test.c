@@ -329,6 +329,38 @@ nfs4_op_open(__unused struct nfs_context *nfs, nfs_argop4 *op, char *opath)
 }
 
 static int
+nfs4_op_open_confirm(struct nfs_context *nfs, nfs_argop4 *op, struct nfsfh *fh)
+{
+	OPEN_CONFIRM4args *ocargs;
+
+	op[0].argop = OP_OPEN_CONFIRM;
+	ocargs = &op[0].nfs_argop4_u.opopen_confirm;
+	memset(ocargs, 0, sizeof(*ocargs));
+	ocargs->open_stateid.seqid = fh->stateid.seqid;
+	memcpy(&ocargs->open_stateid.other, fh->stateid.other, 12);
+	ocargs->seqid = nfs->seqid;
+
+	return 1;
+}
+
+static int
+nfs4_op_open_downgrade(struct nfs_context *nfs, nfs_argop4 *op, struct nfsfh *fh, uint32_t share_access, uint32_t share_deny)
+{
+	OPEN_DOWNGRADE4args *odargs;
+
+	op[0].argop = OP_OPEN_DOWNGRADE;
+	odargs = &op[0].nfs_argop4_u.opopen_downgrade;
+	memset(odargs, 0, sizeof(*odargs));
+	odargs->open_stateid.seqid = fh->stateid.seqid;
+	memcpy(&odargs->open_stateid.other, fh->stateid.other, 12);
+	odargs->seqid = nfs->seqid;
+	odargs->share_access = share_access;
+	odargs->share_deny = share_deny;
+
+	return 1;
+}
+
+static int
 nfs4_op_savefh(__unused struct nfs_context *nfs, nfs_argop4 *op)
 {
 	op[0].argop = OP_SAVEFH;
@@ -1281,6 +1313,91 @@ ATF_TC_CLEANUP(nfs4_openattr_failure, tc)
 	cleanup();
 }
 
+ATF_TC_WITH_CLEANUP(nfs4_openconfirm_success);
+ATF_TC_HEAD(nfs4_openconfirm_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 openconfirm sub-op");
+}
+
+ATF_TC_BODY(nfs4_openconfirm_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_OPENCONFIRM, &au_test_data);
+	const char *regex = "nfsrvd_openconfirm.*return,success";
+	FILE *pipefd = setup(fds, auclass);
+
+	/* openconfirm subop is made just after open subop in nfs_open. */
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
+	check_audit(fds, (regex), pipefd);
+}
+
+ATF_TC_CLEANUP(nfs4_openconfirm_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_openconfirm_failure);
+ATF_TC_HEAD(nfs4_openconfirm_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 openconfirm sub-op");
+}
+
+ATF_TC_BODY(nfs4_openconfirm_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[1];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_OPENCONFIRM, &au_test_data);
+	const char *regex = "nfsrvd_openconfirm.*return,failure";
+
+	/* Invalid use of open_confirm operation. */
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
+	i = nfs4_op_open_confirm(nfs, &op[0], nfsfh);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_openconfirm_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_opendowngrade_success);
+ATF_TC_HEAD(nfs4_opendowngrade_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 opendowngrade sub-op");
+}
+
+ATF_TC_BODY(nfs4_opendowngrade_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_OPENDOWNGRADE, &au_test_data);
+	const char *regex = "nfsrvd_opendowngrade.*return,success";
+
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	i += nfs4_op_open_downgrade(nfs, &op[i], nfsfh,
+	    OPEN4_SHARE_ACCESS_READ, OPEN4_SHARE_DENY_NONE);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_opendowngrade_success, tc)
+{
+	cleanup();
+}
 
 ATF_TP_ADD_TCS(tp)
 {
@@ -1317,10 +1434,10 @@ ATF_TP_ADD_TCS(tp)
     	ATF_TP_ADD_TC(tp, nfs4_open_success);
 	ATF_TP_ADD_TC(tp, nfs4_open_failure);
 	ATF_TP_ADD_TC(tp, nfs4_openattr_failure); /* NFSv4 service not supported */
-//	ATF_TP_ADD_TC(tp, nfs4_openconfirm_success);
-//	ATF_TP_ADD_TC(tp, nfs4_openconfirm_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_opendowngrade_success);
-//      ATF_TP_ADD_TC(tp, nfs4_opendowngrade_failure);
+	ATF_TP_ADD_TC(tp, nfs4_openconfirm_success);
+	ATF_TP_ADD_TC(tp, nfs4_openconfirm_failure);
+	ATF_TP_ADD_TC(tp, nfs4_opendowngrade_success);
+//	ATF_TP_ADD_TC(tp, nfs4_opendowngrade_failure);
 //	ATF_TP_ADD_TC(tp, nfs4_putfh_success);
 //      ATF_TP_ADD_TC(tp, nfs4_putfh_failure);
 //	ATF_TP_ADD_TC(tp, nfs4_putpubfh_success);
