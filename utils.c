@@ -277,13 +277,19 @@ struct nfs_context
 	ATF_REQUIRE((exportsfile = fopen("NFSAuditExports", "w")) != NULL);
 
 	if (au_rpc_event >= AUE_NFSV4RPC_COMPOUND)
-		fprintf(exportsfile, "V4: / 127.1\n");
-	fprintf(exportsfile, "%s -mapall=root 127.1\n", cwd);
+		fprintf(exportsfile, "V4: / %s\n", SERVER);
+	fprintf(exportsfile, "%s -mapall=root %s\n", cwd, SERVER);
 	fclose(exportsfile);
 	ATF_REQUIRE_EQ(0, system("mountd NFSAuditExports"));
 
 	ATF_REQUIRE_EQ(0, system("service nfsd onestatus || \
 	    { service nfsd onestart && touch started_nfsd ; }"));
+	/*
+	 * restart nfsd, just to make sure changed configurations are properly loaded
+	 * if nfsd was already running.
+	 */
+	if (!atf_utils_file_exists("started_nfsd"))
+		ATF_REQUIRE_EQ(0, system("service nfsd restart"));
 
 	url.server = SERVER;
 	url.path = cwd;
