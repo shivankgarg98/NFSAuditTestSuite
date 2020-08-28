@@ -1,5 +1,6 @@
 /*-
  * Copyright 2018 Aniket Pandey
+ * Copyright 2020 Shivank Garg
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,7 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * SUCH DAMAGE.
  *
- * $FreeBSD$
  */
 
 #include <sys/ioctl.h>
