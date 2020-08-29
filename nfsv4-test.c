@@ -158,20 +158,6 @@ nfs4_op_delegreturn(__unused struct nfs_context *nfs, nfs_argop4 *op, struct nfs
 }
 
 static int
-nfs4_op_putfh(__unused struct nfs_context *nfs, nfs_argop4 *op, struct nfsfh *nfsfh)
-{
-	PUTFH4args *pfargs;
-
-	op[0].argop = OP_PUTFH;
-	pfargs = &op[0].nfs_argop4_u.opputfh;
-	memset(pfargs, 0, sizeof(*pfargs));
-	pfargs->object.nfs_fh4_len = nfsfh->fh.len;
-	pfargs->object.nfs_fh4_val = nfsfh->fh.val;
-
-	return 1;
-}
-
-static int
 nfs4_op_getattr(__unused struct nfs_context *nfs, nfs_argop4 *op,
                 uint32_t *attributes, int count)
 {
@@ -374,6 +360,68 @@ nfs4_op_open_downgrade(struct nfs_context *nfs, nfs_argop4 *op, struct nfsfh *fh
 	odargs->seqid = nfs->seqid;
 	odargs->share_access = share_access;
 	odargs->share_deny = share_deny;
+
+	return 1;
+}
+
+static int
+nfs4_op_putfh(__unused struct nfs_context *nfs, nfs_argop4 *op, struct nfsfh *fh)
+{
+	PUTFH4args *pfargs;
+
+	op[0].argop = OP_PUTFH;
+	pfargs = &op[0].nfs_argop4_u.opputfh;
+	memset(pfargs, 0, sizeof(*pfargs));
+	pfargs->object.nfs_fh4_len = fh->fh.len;
+	pfargs->object.nfs_fh4_val = fh->fh.val;
+
+	return 1;
+}
+
+static int
+nfs4_op_read(__unused struct nfs_context *nfs, nfs_argop4 *op, struct nfsfh *fh,
+    uint64_t offset, size_t count)
+{
+	READ4args *rargs;
+
+	op[0].argop = OP_READ;
+	rargs = &op[0].nfs_argop4_u.opread;
+	rargs->stateid.seqid = fh->stateid.seqid;
+	memcpy(&rargs->stateid.other, fh->stateid.other, 12);
+	rargs->offset = offset;
+	rargs->count = count;
+
+	return 1;
+}
+
+static int
+nfs4_op_readdir(__unused struct nfs_context *nfs, nfs_argop4 *op, uint64_t cookie)
+{
+	READDIR4args *rdargs;
+
+	op[0].argop = OP_READDIR;
+	rdargs = &op[0].nfs_argop4_u.opreaddir;
+	memset(rdargs, 0, sizeof(*rdargs));
+
+	rdargs->cookie = cookie;
+	rdargs->dircount = 8192;
+	rdargs->maxcount = 8192;
+	rdargs->attr_request.bitmap4_len = 2;
+	rdargs->attr_request.bitmap4_val = standard_attributes;
+
+	return 1;
+}
+
+static int
+nfs4_op_remove(__unused struct nfs_context *nfs, nfs_argop4 *op, char *name)
+{
+	REMOVE4args *rmargs;
+
+	op[0].argop = OP_REMOVE;
+	rmargs = &op[0].nfs_argop4_u.opremove;
+	memset(rmargs, 0, sizeof(*rmargs));
+	rmargs->target.utf8string_len = strlen(name);
+	rmargs->target.utf8string_val = name;
 
 	return 1;
 }
@@ -812,7 +860,7 @@ ATF_TC_BODY(nfs4_getfh_failure, tc)
 {
 	struct au_rpc_data au_test_data;
 	int i;
-	nfs_argop4 op[2];
+	nfs_argop4 op[1];
 	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_GETFH, &au_test_data);
 	const char *regex = "nfsrvd_getfh.*return,failure";
 
@@ -1417,6 +1465,403 @@ ATF_TC_CLEANUP(nfs4_opendowngrade_success, tc)
 	cleanup();
 }
 
+ATF_TC_WITH_CLEANUP(nfs4_opendowngrade_failure);
+ATF_TC_HEAD(nfs4_opendowngrade_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 opendowngrade sub-op");
+}
+
+ATF_TC_BODY(nfs4_opendowngrade_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_OPENDOWNGRADE, &au_test_data);
+	const char *regex = "nfsrvd_opendowngrade.*return,failure";
+
+	/* Due to lock being held, the operation fails with NFS4ERR_LOCKS_HELD error. */
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
+	ATF_REQUIRE_EQ(0, nfs_lockf(nfs, nfsfh, NFS4_F_LOCK, 1));
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	i += nfs4_op_open_downgrade(nfs, &op[i], nfsfh,
+	    OPEN4_SHARE_ACCESS_READ, OPEN4_SHARE_DENY_NONE);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_opendowngrade_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_putfh_success);
+ATF_TC_HEAD(nfs4_putfh_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 putfh sub-op");
+}
+
+ATF_TC_BODY(nfs4_putfh_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[1];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_PUTFH, &au_test_data);
+	const char *regex = "NFSV4OP_PUTFH.*return,success";
+
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_putfh_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_putfh_failure);
+ATF_TC_HEAD(nfs4_putfh_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 putfh sub-op");
+}
+
+ATF_TC_BODY(nfs4_putfh_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[1];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_PUTFH, &au_test_data);
+	const char *regex = "NFSV4OP_PUTFH.*return,failure";
+
+	/* PUTH OP fails due to Stale NFS file handle error. */
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	ATF_REQUIRE_EQ(0, remove(path));
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_putfh_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_putpubfh_success);
+ATF_TC_HEAD(nfs4_putpubfh_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 putpubfh sub-op");
+}
+
+ATF_TC_BODY(nfs4_putpubfh_success, tc)
+{
+	/*
+	 * XXX: https://tools.ietf.org/html/rfc5661#section-18.20
+	 * but How to use this operation correctly??
+	 */
+	struct au_rpc_data au_test_data;
+	int i = 0;
+	nfs_argop4 op[1];
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_PUTPUBFH, &au_test_data);
+	const char *regex = "NFSV4OP_PUTPUBFH.*return,success";
+
+	op[i++].argop = OP_PUTPUBFH;
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_putpubfh_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_putpubfh_failure);
+ATF_TC_HEAD(nfs4_putpubfh_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 putpubfh sub-op");
+}
+
+ATF_TC_BODY(nfs4_putpubfh_failure, tc)
+{
+	struct au_rpc_data au_test_data;
+	int i = 0;
+	nfs_argop4 op[1];
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_PUTPUBFH, &au_test_data);
+	const char *regex = "NFSV4OP_PUTPUBFH.*return,failure";
+
+	op[i++].argop = OP_PUTPUBFH;
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_putpubfh_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_putrootfh_success);
+ATF_TC_HEAD(nfs4_putrootfh_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 putrootfh sub-op");
+}
+
+ATF_TC_BODY(nfs4_putrootfh_success, tc)
+{
+	struct au_rpc_data au_test_data;
+	int i = 0;
+	nfs_argop4 op[1];
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_PUTROOTFH, &au_test_data);
+	const char *regex = "NFSV4OP_PUTROOTFH.*return,success";
+
+	op[i++].argop = OP_PUTROOTFH;
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_putrootfh_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_read_success);
+ATF_TC_HEAD(nfs4_read_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 read sub-op");
+}
+
+ATF_TC_BODY(nfs4_read_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_READ, &au_test_data);
+	const char *regex = "nfsrvd_read.*return,success";
+
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	i += nfs4_op_read(nfs, &op[i], nfsfh, 0, 0);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_read_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_read_failure);
+ATF_TC_HEAD(nfs4_read_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 read sub-op");
+}
+
+ATF_TC_BODY(nfs4_read_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i = 0;
+	nfs_argop4 op[2];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_READ, &au_test_data);
+	const char *regex = "nfsrvd_read.*return,failure";
+
+	/* Invalid FH for READ op, since it is directory. */
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
+	op[i++].argop = OP_PUTROOTFH;
+	i += nfs4_op_read(nfs, &op[i], nfsfh, 0, 0);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_read_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_readdir_success);
+ATF_TC_HEAD(nfs4_readdir_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 readdir sub-op");
+}
+
+ATF_TC_BODY(nfs4_readdir_success, tc)
+{
+	struct au_rpc_data au_test_data;
+	int i = 0;
+	nfs_argop4 op[2];
+	struct nfsfh dirfh;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_READDIR, &au_test_data);
+	const char *regex = "nfsrvd_readdirplus.*return,success";
+
+	dirfh.fh.len = nfs->rootfh.len;
+	dirfh.fh.val = nfs->rootfh.val;
+	i = nfs4_op_putfh(nfs, &op[0], &dirfh);
+	i += nfs4_op_readdir(nfs, &op[i], 0);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_readdir_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_readdir_failure);
+ATF_TC_HEAD(nfs4_readdir_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 readdir sub-op");
+}
+
+ATF_TC_BODY(nfs4_readdir_failure, tc)
+{
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_READDIR, &au_test_data);
+	const char *regex = "nfsrvd_readdirplus.*return,failure";
+
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_CREAT, &nfsfh));
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	i += nfs4_op_readdir(nfs, &op[i], 0);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_readdir_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_readlink_success);
+ATF_TC_HEAD(nfs4_readlink_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 readlink sub-op");
+}
+
+ATF_TC_BODY(nfs4_readlink_success, tc)
+{
+	ATF_REQUIRE_EQ(0, symlink(path, "symlink"));
+
+	struct au_rpc_data au_test_data;
+	char buf[PATH_MAX];
+	FILE* pipefd;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_READLINK, &au_test_data);
+	const char *regex = "nfsrvd_readlink.*return,success";
+
+	/* XXX: used high-level API here to avoid the code complications. */ 
+	pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, nfs_readlink(nfs, "symlink", buf, sizeof(buf)));
+	ATF_REQUIRE_MATCH(buf, path);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs4_readlink_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_readlink_failure);
+ATF_TC_HEAD(nfs4_readlink_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 readlink sub-op");
+}
+
+ATF_TC_BODY(nfs4_readlink_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	char buf[PATH_MAX];
+	FILE* pipefd;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_READLINK, &au_test_data);
+	const char *regex = "nfsrvd_readlink.*return,failure";
+
+	/* XXX: used high-level API here to avoid the code complications. */
+	/* path is a regular file and not symlink. */
+	pipefd = setup(fds, auclass);
+	ATF_REQUIRE(nfs_readlink(nfs, path, buf, sizeof(buf)) != 0);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(nfs4_readlink_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_remove_success);
+ATF_TC_HEAD(nfs4_remove_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 remove sub-op");
+}
+
+ATF_TC_BODY(nfs4_remove_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
+	struct nfsfh dirfh;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_REMOVE, &au_test_data);
+	const char *regex = "nfsrvd_remove.*return,success";
+
+	dirfh.fh.len = nfs->rootfh.len;
+	dirfh.fh.val = nfs->rootfh.val;
+	i = nfs4_op_putfh(nfs, &op[0], &dirfh);	
+	i += nfs4_op_remove(nfs, &op[i], path);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_remove_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_remove_failure);
+ATF_TC_HEAD(nfs4_remove_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 remove sub-op");
+}
+
+ATF_TC_BODY(nfs4_remove_failure, tc)
+{
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
+	struct nfsfh dirfh;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_REMOVE, &au_test_data);
+	const char *regex = "nfsrvd_remove.*return,failure";
+
+	/* No file or directory exists with name path. */
+	dirfh.fh.len = nfs->rootfh.len;
+	dirfh.fh.val = nfs->rootfh.val;
+	i = nfs4_op_putfh(nfs, &op[0], &dirfh);
+	i += nfs4_op_remove(nfs, &op[i], path);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_remove_failure, tc)
+{
+	cleanup();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, nfs4_access_success);
@@ -1455,21 +1900,21 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, nfs4_openconfirm_success);
 	ATF_TP_ADD_TC(tp, nfs4_openconfirm_failure);
 	ATF_TP_ADD_TC(tp, nfs4_opendowngrade_success);
-//	ATF_TP_ADD_TC(tp, nfs4_opendowngrade_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_putfh_success);
-//      ATF_TP_ADD_TC(tp, nfs4_putfh_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_putpubfh_success);
-//      ATF_TP_ADD_TC(tp, nfs4_putpubfh_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_putrootfh_success);
-//      ATF_TP_ADD_TC(tp, nfs4_putrootfh_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_read_success);
-//	ATF_TP_ADD_TC(tp, nfs4_read_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_readdir_success);
-//	ATF_TP_ADD_TC(tp, nfs4_readdir_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_readlink_success);
-//	ATF_TP_ADD_TC(tp, nfs4_readlink_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_remove_success);
-//	ATF_TP_ADD_TC(tp, nfs4_remove_failure);
+	ATF_TP_ADD_TC(tp, nfs4_opendowngrade_failure);
+	ATF_TP_ADD_TC(tp, nfs4_putfh_success);
+	ATF_TP_ADD_TC(tp, nfs4_putfh_failure);
+	ATF_TP_ADD_TC(tp, nfs4_putpubfh_success); /* How to use? */
+	ATF_TP_ADD_TC(tp, nfs4_putpubfh_failure); /* How to use? */
+	ATF_TP_ADD_TC(tp, nfs4_putrootfh_success);
+//	ATF_TP_ADD_TC(tp, nfs4_putrootfh_failure); //How can it fail?
+	ATF_TP_ADD_TC(tp, nfs4_read_success);
+	ATF_TP_ADD_TC(tp, nfs4_read_failure);
+	ATF_TP_ADD_TC(tp, nfs4_readdir_success);
+	ATF_TP_ADD_TC(tp, nfs4_readdir_failure);
+	ATF_TP_ADD_TC(tp, nfs4_readlink_success);
+	ATF_TP_ADD_TC(tp, nfs4_readlink_failure);
+	ATF_TP_ADD_TC(tp, nfs4_remove_success);
+	ATF_TP_ADD_TC(tp, nfs4_remove_failure);
 //	ATF_TP_ADD_TC(tp, nfs4_rename_success);
 //	ATF_TP_ADD_TC(tp, nfs4_rename_failure);
 //	ATF_TP_ADD_TC(tp, nfs4_renew_success);
