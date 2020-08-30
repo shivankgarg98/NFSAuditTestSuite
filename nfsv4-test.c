@@ -297,7 +297,7 @@ nfs4_op_nverify_chmod(__unused struct nfs_context *nfs,
     nfs_argop4 *op, void *nvbuf)
 {
 	NVERIFY4args *verifyargs;
-	uint32_t mask[2] = {0, 1 << (FATTR4_MODE - 32)};
+	static uint32_t mask[2] = {0, 1 << (FATTR4_MODE - 32)};
 
 	op[0].argop = OP_NVERIFY;
 	verifyargs = &op[0].nfs_argop4_u.opnverify;
@@ -442,7 +442,19 @@ nfs4_op_rename(__unused struct nfs_context *nfs, nfs_argop4 *op, char *oldname,
 
 	return 1;
 }
+static int
+nfs4_op_release_lock_owner(struct nfs_context *nfs, nfs_argop4 *op, uint64_t clientid)
+{
+	RELEASE_LOCKOWNER4args *rloargs;
 
+	op[0].argop = OP_RELEASE_LOCKOWNER;
+	rloargs = &op[0].nfs_argop4_u.oprelease_lockowner;
+	rloargs->lock_owner.clientid = clientid;
+	rloargs->lock_owner.owner.owner_len = strlen(nfs->client_name);
+	rloargs->lock_owner.owner.owner_val = nfs->client_name;
+
+	return 1;
+}
 static int
 nfs4_op_savefh(__unused struct nfs_context *nfs, nfs_argop4 *op)
 {
@@ -452,8 +464,8 @@ nfs4_op_savefh(__unused struct nfs_context *nfs, nfs_argop4 *op)
 }
 
 static int
-nfs4_op_setattr_chmod(__unused struct nfs_context *nfs,
-    nfs_argop4 *op, struct nfsfh *fh, void *sabuf)
+nfs4_op_setattr_chmod(__unused struct nfs_context *nfs, nfs_argop4 *op,
+    struct nfsfh *fh, void *sabuf)
 {
 	SETATTR4args *saargs;
 	uint32_t mask[2] = {0, 1 << (FATTR4_MODE - 32)};
@@ -522,6 +534,29 @@ nfs4_op_verify_chmod(__unused struct nfs_context *nfs,
 	verifyargs->obj_attributes.attrmask.bitmap4_val = mask;
 	verifyargs->obj_attributes.attr_vals.attrlist4_len = 4;
 	verifyargs->obj_attributes.attr_vals.attrlist4_val = nvbuf;
+
+	return 1;
+}
+
+static int
+nfs4_op_write(__unused struct nfs_context *nfs, nfs_argop4 *op, struct nfsfh *fh,
+              uint64_t offset, size_t count, char *buf)
+{
+	WRITE4args *wargs;
+
+	op[0].argop = OP_WRITE;
+	wargs = &op[0].nfs_argop4_u.opwrite;
+	wargs->stateid.seqid = fh->stateid.seqid;
+	memcpy(wargs->stateid.other, fh->stateid.other, 12);
+	wargs->offset = offset;
+	if (fh->is_sync) {
+	        wargs->stable = DATA_SYNC4;
+	} else {
+	        wargs->stable = UNSTABLE4;
+	        fh->is_dirty = 1;
+	}
+	wargs->data.data_len = count;
+	wargs->data.data_val = buf;
 
 	return 1;
 }
@@ -2468,6 +2503,116 @@ ATF_TC_CLEANUP(nfs4_verify_failure, tc)
 	cleanup();
 }
 
+ATF_TC_WITH_CLEANUP(nfs4_write_success);
+ATF_TC_HEAD(nfs4_write_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 write sub-op");
+}
+
+ATF_TC_BODY(nfs4_write_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_WRITE, &au_test_data);
+	const char *regex = "nfsrvd_write.*return,success";
+	char wbuf[] = "buffer";
+
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDWR, &nfsfh));
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	i += nfs4_op_write(nfs, &op[i], nfsfh, 0, strlen(wbuf), wbuf);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_write_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_write_failure);
+ATF_TC_HEAD(nfs4_write_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 write sub-op");
+}
+
+ATF_TC_BODY(nfs4_write_failure, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, 0777) != -1);
+
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[2];
+	struct nfsfh *nfsfh = NULL;
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_WRITE, &au_test_data);
+	const char *regex = "nfsrvd_write.*return,failure";
+	char wbuf[] = "buffer";
+
+	/* The file is opened as Read only. Write will return error. */
+	ATF_REQUIRE_EQ(0, nfs_open(nfs, path, O_RDONLY, &nfsfh));
+	i = nfs4_op_putfh(nfs, &op[0], nfsfh);
+	i += nfs4_op_write(nfs, &op[i], nfsfh, 0, strlen(wbuf), wbuf);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_write_failure, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_releaselckown_success);
+ATF_TC_HEAD(nfs4_releaselckown_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"NFSv4 releaselckown sub-op");
+}
+
+ATF_TC_BODY(nfs4_releaselckown_success, tc)
+{
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[1];
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_RELEASELCKOWN, &au_test_data);
+	const char *regex = "nfsrvd_releaselckown.*return,success";
+
+	i = nfs4_op_release_lock_owner(nfs, &op[0], nfs->clientid);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, true);
+}
+
+ATF_TC_CLEANUP(nfs4_releaselckown_success, tc)
+{
+	cleanup();
+}
+
+ATF_TC_WITH_CLEANUP(nfs4_releaselckown_failure);
+ATF_TC_HEAD(nfs4_releaselckown_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"NFSv4 releaselckown sub-op");
+}
+
+ATF_TC_BODY(nfs4_releaselckown_failure, tc)
+{
+	struct au_rpc_data au_test_data;
+	int i;
+	nfs_argop4 op[1];
+	struct nfs_context *nfs = tc_body_init(AUE_NFSV4OP_RELEASELCKOWN, &au_test_data);
+	const char *regex = "nfsrvd_releaselckown.*return,failure";
+
+	/* It fails due to invalid clientid. */
+	i = nfs4_op_release_lock_owner(nfs, &op[0], nfs->clientid + 0xffff);
+	NFS4_COMMON_PERFORM(i, op, regex, nfs, au_test_data, false);
+}
+
+ATF_TC_CLEANUP(nfs4_releaselckown_failure, tc)
+{
+	cleanup();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, nfs4_compound_rpc);
@@ -2503,7 +2648,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, nfs4_nverify_failure);
     	ATF_TP_ADD_TC(tp, nfs4_open_success);
 	ATF_TP_ADD_TC(tp, nfs4_open_failure);
-	ATF_TP_ADD_TC(tp, nfs4_openattr_failure); /* NFSv4 service not supported */
+	ATF_TP_ADD_TC(tp, nfs4_openattr_failure); /* NFSv4 service not supported by FreeBSD */
 	ATF_TP_ADD_TC(tp, nfs4_openconfirm_success);
 	ATF_TP_ADD_TC(tp, nfs4_openconfirm_failure);
 	ATF_TP_ADD_TC(tp, nfs4_opendowngrade_success);
@@ -2540,69 +2685,72 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, nfs4_setclientidcfrm_failure);
 	ATF_TP_ADD_TC(tp, nfs4_verify_success);
 	ATF_TP_ADD_TC(tp, nfs4_verify_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_write_success);
-//	ATF_TP_ADD_TC(tp, nfs4_write_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_releaselckown_success);
-//	ATF_TP_ADD_TC(tp, nfs4_releaselckown_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_backchannelctl_failure); /* NFSv4 service not supported */
-//	ATF_TP_ADD_TC(tp, nfs4_bindconntosess_success);
-//	ATF_TP_ADD_TC(tp, nfs4_bindconntosess_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_exchangeid_success);
-//	ATF_TP_ADD_TC(tp, nfs4_exchangeid_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_createsession_success);
-//	ATF_TP_ADD_TC(tp, nfs4_createsession_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_destroysession_success);
-//	ATF_TP_ADD_TC(tp, nfs4_destroysession_failure);
+	ATF_TP_ADD_TC(tp, nfs4_write_success);
+	ATF_TP_ADD_TC(tp, nfs4_write_failure);
+	ATF_TP_ADD_TC(tp, nfs4_releaselckown_success);
+	ATF_TP_ADD_TC(tp, nfs4_releaselckown_failure);
+	/* Additional Ops for NFSv4.1. */
+//	ATF_TP_ADD_TC(tp, nfs4_backchannelctl_failure); /* NFSv4 service not supported by FreeBSD */
+//	ATF_TP_ADD_TC(tp, nfs4_bindconntosess_success); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_bindconntosess_failure); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_exchangeid_success); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_exchangeid_failure); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_createsession_success); /* How to populate args for request */
+//	ATF_TP_ADD_TC(tp, nfs4_createsession_failure); /* How to populate args for request */
+//	ATF_TP_ADD_TC(tp, nfs4_destroysession_success); /* Depends on createsession for sessionid */
+//	ATF_TP_ADD_TC(tp, nfs4_destroysession_failure); /* Depends on createsession for sessionid */
 //	ATF_TP_ADD_TC(tp, nfs4_freestateid_success);
 //	ATF_TP_ADD_TC(tp, nfs4_freestateid_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_getdirdeleg_failure); /* NFSv4 service not supported */
+//	ATF_TP_ADD_TC(tp, nfs4_getdirdeleg_failure); /* NFSv4 service not supported by FreeBSD */
 //	ATF_TP_ADD_TC(tp, nfs4_getdevinfo_success);
 //	ATF_TP_ADD_TC(tp, nfs4_getdevinfo_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_getdevlist_failure); /* NFSv4 service not supported */
+//	ATF_TP_ADD_TC(tp, nfs4_getdevlist_failure); /* NFSv4 service not supported by FreeBSD */
 //	ATF_TP_ADD_TC(tp, nfs4_layoutcommit_success);
 //	ATF_TP_ADD_TC(tp, nfs4_layoutcommit_failure);
 //	ATF_TP_ADD_TC(tp, nfs4_layoutget_success);
 //	ATF_TP_ADD_TC(tp, nfs4_layoutget_failure);
 //	ATF_TP_ADD_TC(tp, nfs4_layoutreturn_success);
 //	ATF_TP_ADD_TC(tp, nfs4_layoutreturn_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_secinfononame_failure); /* NFSv4 service not supported */
+//	ATF_TP_ADD_TC(tp, nfs4_secinfononame_failure); /* NFSv4 service not supported by FreeBSD */
 //	ATF_TP_ADD_TC(tp, nfs4_sequence_success);
 //	ATF_TP_ADD_TC(tp, nfs4_sequence_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_setssv_failure); /* NFSv4 service not supported */
+//	ATF_TP_ADD_TC(tp, nfs4_setssv_failure); /* NFSv4 service not supported by FreeBSD */
 //	ATF_TP_ADD_TC(tp, nfs4_teststateid_success);
 //	ATF_TP_ADD_TC(tp, nfs4_teststateid_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_wantdeleg_failure); /* NFSv4 service not supported */
+//	ATF_TP_ADD_TC(tp, nfs4_wantdeleg_failure); /* NFSv4 service not supported by FreeBSD */
 //	ATF_TP_ADD_TC(tp, nfs4_destroyclientid_success);
 //	ATF_TP_ADD_TC(tp, nfs4_destroyclientid_failure);
 //	ATF_TP_ADD_TC(tp, nfs4_reclaimcompl_success);
 //	ATF_TP_ADD_TC(tp, nfs4_reclaimcompl_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_allocate_success);
-//	ATF_TP_ADD_TC(tp, nfs4_allocate_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_copy_success);
-//	ATF_TP_ADD_TC(tp, nfs4_copy_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_copynotify_failure); /* NFSv4 service not supported */
-//	ATF_TP_ADD_TC(tp, nfs4_deallocate_failure); /* NFSv4 service not supported */
-//	ATF_TP_ADD_TC(tp, nfs4_ioadvise_success);
-//	ATF_TP_ADD_TC(tp, nfs4_ioadvise_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_layouterror_success);
-//	ATF_TP_ADD_TC(tp, nfs4_layouterror_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_layoutstats_success);
-//	ATF_TP_ADD_TC(tp, nfs4_layoutstats_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_offloadcancel_failure); /* NFSv4 service not supported */
-//	ATF_TP_ADD_TC(tp, nfs4_offloadstatus_failure); /* NFSv4 service not supported */
-//	ATF_TP_ADD_TC(tp, nfs4_readplus_failure); /* NFSv4 service not supported */
-//	ATF_TP_ADD_TC(tp, nfs4_seek_success);
-//	ATF_TP_ADD_TC(tp, nfs4_seek_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_writesame_failure); /* NFSv4 service not supported */
+	/* Additional operations for NFSv4.2. */
+//	ATF_TP_ADD_TC(tp, nfs4_allocate_success); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_allocate_failure); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_copy_success); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_copy_failure); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_copynotify_failure); /* NFSv4 service not supported by FreeBSD */
+//	ATF_TP_ADD_TC(tp, nfs4_deallocate_failure); /* NFSv4 service not supported by FreeBSD */
+//	ATF_TP_ADD_TC(tp, nfs4_ioadvise_success); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_ioadvise_failure); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_layouterror_success); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_layouterror_failure); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_layoutstats_success); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_layoutstats_failure); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_offloadcancel_failure); /* NFSv4 service not supported by FreeBSD */
+//	ATF_TP_ADD_TC(tp, nfs4_offloadstatus_failure); /* NFSv4 service not supported by FreeBSD */
+//	ATF_TP_ADD_TC(tp, nfs4_readplus_failure); /* NFSv4 service not supported by FreeBSD */
+//	ATF_TP_ADD_TC(tp, nfs4_seek_success); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_seek_failure); /* Not supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_writesame_failure); /* NFSv4 service not supported by FreeBSD */
 //	ATF_TP_ADD_TC(tp, nfs4_clone_failure); /* NFSv4 service not supported */
-//	ATF_TP_ADD_TC(tp, nfs4_getxattr_success);
-//	ATF_TP_ADD_TC(tp, nfs4_getxattr_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_setxattr_success);
-//	ATF_TP_ADD_TC(tp, nfs4_setxattr_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_listxattrs_success);
-//	ATF_TP_ADD_TC(tp, nfs4_listxattrs_failure);
-//	ATF_TP_ADD_TC(tp, nfs4_removexattr_success);
-//	ATF_TP_ADD_TC(tp, nfs4_removexattr_failure);
+//	ATF_TP_ADD_TC(tp, nfs4_getxattr_success); /* Not Supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_getxattr_failure); /* Not Supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_setxattr_success); /* Not Supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_setxattr_failure); /* Not Supported by libnfs */
+	/* The optional Extended attribute operations (RFC-8276) */
+//	ATF_TP_ADD_TC(tp, nfs4_listxattrs_success); /* Not Supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_listxattrs_failure); /* Not Supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_removexattr_success); /* Not Supported by libnfs */
+//	ATF_TP_ADD_TC(tp, nfs4_removexattr_failure); /* Not Supported by libnfs */
 
 	return (atf_no_error());
 }

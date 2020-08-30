@@ -288,8 +288,8 @@ struct nfs_context
 	 * restart nfsd, just to make sure changed configurations are properly loaded
 	 * if nfsd was already running.
 	 */
-	if (!atf_utils_file_exists("started_nfsd"))
-		ATF_REQUIRE_EQ(0, system("service nfsd restart"));
+//	if (!atf_utils_file_exists("started_nfsd"))
+//		ATF_REQUIRE_EQ(0, system("service nfsd restart"));
 
 	url.server = SERVER;
 	url.path = cwd;
